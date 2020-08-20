@@ -4,5 +4,7 @@ library(tseries)
 library(fUnitRoots)
 library(lmtest)
 library(forecast)
+library(h2o)
+library(caret)
 
 thesis <- paste0(getwd(),"/")
