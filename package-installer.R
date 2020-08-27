@@ -1,2 +1,10 @@
-install.packages(c("dplyr", "lubridate", "tseries", "fUnitRoots", "lmtest", "forecast", "h2o", "caret"))
+install.packages(c("dplyr", 
+                   "lubridate", 
+                   "tseries", 
+                   "fUnitRoots", 
+                   "lmtest", 
+                   "forecast", 
+                   "h2o", 
+                   "caret",
+                   "tsibble"))
                  
