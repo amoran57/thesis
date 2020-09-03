@@ -16,6 +16,7 @@ df <- read.csv(paste0(thesis, "CPIAUCSL.csv")) %>%
 tsData <- ts(df$infl[-1], start = c(1947,2), frequency = 12)
 
 #test residuals
+adf.test(tsData)
 urkpssTest(tsData, type = c("tau"), lags = c("short"),use.lag = NULL, doplot = TRUE)
 
 #plot first difference

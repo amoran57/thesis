@@ -4,7 +4,7 @@ install.packages(c("dplyr",
                    "fUnitRoots", 
                    "lmtest", 
                    "forecast", 
-                   "h2o", 
                    "caret",
-                   "tsibble"))
+                   "tsibble",
+                   "randomForest"))
                  
