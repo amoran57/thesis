@@ -4,7 +4,7 @@ header <- source("header.R")
 
 #Code ------------------------------------------
 #import
-df <- read.csv(paste0(thesis, "CPIAUCSL.csv")) %>% 
+df <- read.csv(paste0(import, "CPIAUCSL.csv")) %>% 
   select(date = DATE, cpi = CPIAUCSL) %>% 
   mutate(date = as.Date(date),
          l_cpi = log(cpi),

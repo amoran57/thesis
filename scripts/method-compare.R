@@ -4,7 +4,7 @@ header <- source("header.R")
 
 #Code ------------------------------------------
 #import data
-df <- read.csv(paste0(thesis, "CPIAUCSL.csv")) %>% 
+df <- read.csv(paste0(import, "CPIAUCSL.csv")) %>% 
   select(date = DATE, cpi = CPIAUCSL) %>% 
   mutate(date = as.Date(date),
          l_cpi = log(cpi),
@@ -12,12 +12,12 @@ df <- read.csv(paste0(thesis, "CPIAUCSL.csv")) %>%
          infl = l_cpi - l_cpi_1) %>% 
   select(date, infl)
 
-month_3 <- read.csv(paste0(thesis, "TB3MS.csv")) %>% 
+month_3 <- read.csv(paste0(import, "TB3MS.csv")) %>% 
   select(DATE, rate_3 = TB3MS) %>% 
   mutate(date = as.Date(DATE)) %>% 
   select(date, rate_3)
 
-month_12 <- read.csv(paste0(thesis, "TB1YR.csv")) %>% 
+month_12 <- read.csv(paste0(import, "TB1YR.csv")) %>% 
   select(DATE, rate_12 = TB1YR) %>% 
   mutate(date = as.Date(DATE)) %>% 
   select(date, rate_12)
@@ -29,42 +29,39 @@ values_df <- df %>%
   mutate(year = lubridate::year(date)) %>% 
   dplyr::filter(year >= 1959)
 
-values_df <- values_df[-c(1:6),]
-
-tsData <- ts(values_df$infl[-1], start = c(1959,7), frequency = 12)
+tsData <- ts(values_df$infl, start = c(1959,1), frequency = 12)
 
 #rolling horizon forecast by ets and auto.arima --------------------
-start_row <- 673
-i <- 12    #number of months of training data, to start 
+start_row <- 1
+i <- 673   #number of months of training data, to start 
 pred_ets <- c()
 pred_arima <- c()
-while(i <= 48){
-  ts <- ts(values_df[start_row:(start_row + i), "infl"], start=c(2015, 1), frequency=12)
+while(i <= 720){
+  ts <- ts(values_df[start_row:(start_row + i), "infl"], start=c(1959, 1), frequency=12)
   
-  pred_e <- forecast(ets(ts), 12)$mean[c(10:12)]
-  pred_a <- forecast(auto.arima(ts), 12)$mean[c(10:12)]
+  pred_e <- forecast(ets(ts), 12)$mean[12]
+  pred_a <- forecast(auto.arima(ts), 12)$mean[12]
   
   pred_ets <- c(pred_ets, pred_e)
   pred_arima <- c(pred_arima, pred_a)
   
-  i = i + 3
+  i = i + 1
 }
 
-pred_ets <- as.data.frame(pred_ets)
-pred_arima <- as.data.frame(pred_arima)
+pred_ets <- as.data.frame(pred_ets[37:48])
+pred_arima <- as.data.frame(pred_arima[37:48])
 
 names(pred_arima) <- "arima"
 names(pred_ets) <- "ets"
 
 pred_arima_df <- pred_arima %>% 
-  mutate(date = seq(as.Date("2016/10/1"), as.Date("2019/12/1"), "month")
-)
-pred_ets_df <- pred_ets %>% 
-  mutate(date = seq(as.Date("2016/10/1"), as.Date("2019/12/1"), "month")
-)
+  mutate(date = seq(as.Date("2019/1/1"), as.Date("2019/12/1"), "month"))
 
-pred_ets <- ts(pred_ets$ets, start=c(2016, 10), frequency = 12)
-pred_arima <- ts(pred_arima$arima, start=c(2016, 10), frequency =12)
+pred_ets_df <- pred_ets %>% 
+  mutate(date = seq(as.Date("2019/1/1"), as.Date("2019/12/1"), "month"))
+
+pred_ets <- ts(pred_ets$ets, start=c(2019, 1), frequency = 12)
+pred_arima <- ts(pred_arima$arima, start=c(2019, 1), frequency =12)
 
 accuracy(pred_ets, tsData)
 accuracy(pred_arima, tsData)
@@ -78,7 +75,7 @@ forecast_df <- left_join(forecast_df, pred_ets_df, by = "date")
 
 train_df <- values_df %>% 
   filter(year < 2019)
-train_tsData <- ts(values_df$infl, start = c(1959, 7), frequency = 12)
+train_tsData <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
 
 lag_order <- 48
 horizon <- 12
@@ -135,8 +132,8 @@ plot_fc <- forecast_df %>%
     y = "Inflation"
   )
 
-tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl", "forest":"naive") %>% 
-  filter(year > 2009 & year < 2020)
+tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl", "arima":"naive") %>% 
+  filter(year > 2016 & year < 2020)
 
 plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) +
   geom_line() +
@@ -144,7 +141,7 @@ plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) 
   theme_minimal() +
   labs(
     title = "Forecasted monthly inflation",
-    subtitle = "Predicted for 2019 given 2015-2018 data",
+    subtitle = "Predicted for 2019 given 1959-2018 data",
     x = "Date",
     y = "Inflation"
   )
@@ -152,8 +149,8 @@ plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) 
 plot_fc
 plot_all
 
-#we find the random forest method has the lowest 
-#RMSE, 35% lower than the naive model
+#we find the ARIMA method has the lowest 
+#RMSE, 45% lower than the naive model
 rmse <- c(accuracy(pred_ets, tsData)[2],
 accuracy(pred_arima, tsData)[2],
 accuracy(y_pred, tsData)[2],
@@ -161,6 +158,7 @@ accuracy(naive_ts, tsData)[2])
 
 names(rmse) <- c("ets", "arima", "forest", "naive")
 rmse["forest"]/rmse["naive"]
-
+rmse["arima"]/rmse["naive"]
+rmse["ets"]/rmse["naive"]
 #export ------------------------------------------
 write_rds(forecast_df, paste0(thesis,"forest_naive_2019_4year_forecast.rds"))
