@@ -4,29 +4,9 @@ header <- source("header.R")
 
 #Code ------------------------------------------
 #import data
-df <- read.csv(paste0(import, "CPIAUCSL.csv")) %>% 
-  select(date = DATE, cpi = CPIAUCSL) %>% 
-  mutate(date = as.Date(date),
-         l_cpi = log(cpi),
-         l_cpi_1 = dplyr::lag(l_cpi),
-         infl = l_cpi - l_cpi_1) %>% 
-  select(date, infl)
-
-month_3 <- read.csv(paste0(import, "TB3MS.csv")) %>% 
-  select(DATE, rate_3 = TB3MS) %>% 
-  mutate(date = as.Date(DATE)) %>% 
-  select(date, rate_3)
-
-month_12 <- read.csv(paste0(import, "TB1YR.csv")) %>% 
-  select(DATE, rate_12 = TB1YR) %>% 
-  mutate(date = as.Date(DATE)) %>% 
-  select(date, rate_12)
-
-df <- left_join(df, month_3, by = "date")
-df <- left_join(df, month_12, by = "date") 
+df <- read_rds(paste0(export, "master_data.rds"))
 
 values_df <- df %>% 
-  mutate(year = lubridate::year(date)) %>% 
   dplyr::filter(year >= 1959)
 
 tsData <- ts(values_df$infl, start = c(1959,1), frequency = 12)
@@ -36,6 +16,9 @@ start_row <- 1
 i <- 673   #number of months of training data, to start 
 pred_ets <- c()
 pred_arima <- c()
+
+tic("arima/ets")
+
 while(i <= 720){
   ts <- ts(values_df[start_row:(start_row + i), "infl"], start=c(1959, 1), frequency=12)
   
@@ -47,6 +30,8 @@ while(i <= 720){
   
   i = i + 1
 }
+
+toc()
 
 pred_ets <- as.data.frame(pred_ets[37:48])
 pred_arima <- as.data.frame(pred_arima[37:48])

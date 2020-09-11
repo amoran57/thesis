@@ -6,5 +6,7 @@ install.packages(c("dplyr",
                    "forecast", 
                    "caret",
                    "tsibble",
-                   "randomForest"))
+                   "randomForest",
+                   "tictoc",
+                   "readr"))
                  

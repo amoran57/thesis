@@ -10,6 +10,7 @@ library(tsibble)
 library(tidyr)
 library(lubridate)
 library(dplyr)
+library(tictoc)
 
 thesis <- paste0(getwd(),"/")
 import <- paste0(thesis,"data/import/")

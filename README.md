@@ -1,5 +1,13 @@
 # thesis
 
+**Steps:**
+1) First run package-installer.R
+2) Then run data-clean.R
+3) Now you're good to run any of the other scripts
+
+Note: header.R and skeleton.R are not meant to be run; they're only referenced in other scripts.
+
+
 **Sources:**
 
 Board of Governors of the Federal Reserve System (US), 10-Year Treasury Constant Maturity Rate [DGS10], retrieved from FRED, Federal Reserve Bank of St. Louis; https://fred.stlouisfed.org/series/DGS10, September 10, 2020.
