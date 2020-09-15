@@ -79,56 +79,31 @@ forest_pred_df <- as.data.frame(y_pred) %>%
 
 forecast_df <- left_join(values_df, forest_pred_df, by = "date")
 # naive model ------------------------------------
-# naive_df <- values_df %>% 
-#   filter(year == 2018) %>% 
-#   select(date, infl) %>% 
-#   mutate(new_date = date + 365) %>% 
-#   select(date = new_date, naive = infl)
-# 
-# naive_ts <- ts(naive_df$naive, start = c(2019, 1), frequency = 12)
-# forecast_df <- left_join(forecast_df, naive_df, by = "date")
+naive_forecast <- window(tsData, start = c(1999, 1), end = c(2018, 12))
+naive_df <- as.data.frame(naive_forecast) %>% 
+  select(naive = x) %>% 
+  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month"))
+
+naive_ts <- ts(naive_df$naive, start = c(2000, 1), frequency = 12)
+forecast_df <- left_join(forecast_df, naive_df, by = "date")
 
 # plot results -----------------------------------
-plot_fc <- forecast_df %>% 
-  ggplot(aes(x = date)) +
-  geom_line(aes(y = infl)) +
-  geom_line(aes(y = forest), color = "blue") +
-  theme_minimal() +
-  labs(
-    title = "Forecasted inflation for 2019",
-    x = "Date",
-    y = "Inflation"
-  )
-
-tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl", "arima":"naive") %>% 
-  filter(year > 2016 & year < 2020)
+tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl", "forest", "naive") %>%
+  filter(year > 1999 & year < 2020)
 
 plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) +
   geom_line() +
-  scale_color_manual(values = c("green", "red", "blue", "black", "gray")) +
+  scale_color_manual(values = c("blue", "black")) +
   theme_minimal() +
   labs(
     title = "Forecasted monthly inflation",
-    subtitle = "Predicted for 2019 given 1959-2018 data",
+    subtitle = "Predicted for 2000-2019 given 1959-2018 data",
     x = "Date",
     y = "Inflation"
   )
 
 plot_fc
 plot_all
-
-#we find the ARIMA method has the lowest 
-#RMSE, 45% lower than the naive model
-rmse <- c(accuracy(pred_ets, tsData)[2],
-          accuracy(pred_arima, tsData)[2],
-          accuracy(y_pred, tsData)[2],
-          accuracy(naive_ts, tsData)[2])
-
-names(rmse) <- c("ets", "arima", "forest", "naive")
-rmse["forest"]/rmse["naive"]
-rmse["arima"]/rmse["naive"]
-rmse["ets"]/rmse["naive"]
-
 
 #export ------------------------------------------
 write_rds(forest_pred_df, paste0(export,"forest_expanding_horizon.rds"))
