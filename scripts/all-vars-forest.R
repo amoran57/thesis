@@ -11,49 +11,6 @@ values_df <- df %>%
 
 tsData <- ts(values_df$infl, start = c(1959,1), frequency = 12)
 
-#rolling horizon forecast by ets and auto.arima --------------------
-start_row <- 1
-i <- 673   #number of months of training data, to start 
-pred_ets <- c()
-pred_arima <- c()
-
-tic("arima/ets")
-
-while(i <= 720){
-  ts <- ts(values_df[start_row:(start_row + i), "infl"], start=c(1959, 1), frequency=12)
-  
-  pred_e <- forecast(ets(ts), 12)$mean[12]
-  pred_a <- forecast(auto.arima(ts), 12)$mean[12]
-  
-  pred_ets <- c(pred_ets, pred_e)
-  pred_arima <- c(pred_arima, pred_a)
-  
-  i = i + 1
-}
-
-toc()
-
-pred_ets <- as.data.frame(pred_ets[37:48])
-pred_arima <- as.data.frame(pred_arima[37:48])
-
-names(pred_arima) <- "arima"
-names(pred_ets) <- "ets"
-
-pred_arima_df <- pred_arima %>% 
-  mutate(date = seq(as.Date("2019/1/1"), as.Date("2019/12/1"), "month"))
-
-pred_ets_df <- pred_ets %>% 
-  mutate(date = seq(as.Date("2019/1/1"), as.Date("2019/12/1"), "month"))
-
-pred_ets <- ts(pred_ets$ets, start=c(2019, 1), frequency = 12)
-pred_arima <- ts(pred_arima$arima, start=c(2019, 1), frequency =12)
-
-accuracy(pred_ets, tsData)
-accuracy(pred_arima, tsData)
-
-forecast_df <- left_join(values_df, pred_arima_df, by = "date")
-forecast_df <- left_join(forecast_df, pred_ets_df, by = "date")
-
 #random forest method --------------------------------------
 #note that this section of code is shamelessly plagiarized
 #from https://www.r-bloggers.com/time-series-forecasting-with-random-forest/
@@ -70,22 +27,25 @@ infl_mbd <- as.data.frame(infl_mbd)
 
 #add other variables
 other_vars_lag_order <- 12
-year10 <- df %>% 
+other_vars <- df %>% 
   filter(date >= as.Date("1962-01-01") & date < as.Date("2018-12-01")) %>% 
-  select(rate10yr)
-ts_year10 <- ts(year10$rate10yr, start = c(1962, 1), frequency = 12)
-ts10_mbd <- embed(ts_year10, other_vars_lag_order)
-ts10_mbd <- as.data.frame(ts10_mbd)
+  select(-c(date, infl, infl_na, spread, survey))
 
-infl_mbd <- cbind(infl_mbd, ts10_mbd)
+for (var in names(other_vars)) {
+  var_ts <- ts(other_vars[var], start = c(1962, 1), frequency = 12)
+  var_mbd <- embed(var_ts, other_vars_lag_order)
+  var_mbd <- as.data.frame(var_mbd)
+  infl_mbd <- cbind(infl_mbd, var_mbd)
+}
 
 y_train <- infl_mbd[,1]
 X_train <- infl_mbd[,-1]
 y_test <- window(tsData, start = c(2019, 1), end = c(2019, 12))
-X_test <- infl_mbd[nrow(infl_mbd), c(1:(lag_order + other_vars_lag_order + 1))]
+X_test <- infl_mbd[nrow(infl_mbd), c(1:(lag_order + 12*length(names(other_vars)) + 1))]
 
 forecasts_rf <- numeric(horizon)
 
+tic("forest")
 for (i in 1:horizon){
   set.seed(1960)
   # fit the model
@@ -97,6 +57,7 @@ for (i in 1:horizon){
   y_train <- y_train[-1] 
   X_train <- X_train[-nrow(X_train), ] 
 }
+toc()
 
 y_pred <- ts(forecasts_rf, start = c(2019, 1), frequency = 12)
 
@@ -105,8 +66,7 @@ forest_pred_df <- as.data.frame(y_pred) %>%
   mutate(date = seq(as.Date("2019/1/1"), as.Date("2019/12/1"), "month")
   )
 
-forecast_df <- left_join(forecast_df, forest_pred_df, by = "date")
-
+forecast_df <- left_join(values_df, forest_pred_df, by = "date")
 # naive model ------------------------------------
 naive_df <- values_df %>% 
   filter(year == 2018) %>% 
@@ -149,9 +109,9 @@ plot_all
 #we find the ARIMA method has the lowest 
 #RMSE, 45% lower than the naive model
 rmse <- c(accuracy(pred_ets, tsData)[2],
-accuracy(pred_arima, tsData)[2],
-accuracy(y_pred, tsData)[2],
-accuracy(naive_ts, tsData)[2])
+          accuracy(pred_arima, tsData)[2],
+          accuracy(y_pred, tsData)[2],
+          accuracy(naive_ts, tsData)[2])
 
 names(rmse) <- c("ets", "arima", "forest", "naive")
 rmse["forest"]/rmse["naive"]
