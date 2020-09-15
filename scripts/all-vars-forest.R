@@ -29,7 +29,7 @@ infl_mbd <- as.data.frame(infl_mbd)
 other_vars_lag_order <- 12
 other_vars <- df %>% 
   filter(date >= as.Date("1962-01-01") & date < as.Date("2018-12-01")) %>% 
-  select(-c(date, infl, infl_na, spread, survey))
+  select(-c(date, infl, infl_na, rate12month, spread, survey, year))
 
 for (var in names(other_vars)) {
   var_ts <- ts(other_vars[var], start = c(1962, 1), frequency = 12)
