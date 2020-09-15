@@ -85,6 +85,7 @@ naive_df <- as.data.frame(naive_forecast) %>%
   mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month"))
 
 naive_ts <- ts(naive_df$naive, start = c(2000, 1), frequency = 12)
+accuracy(naive_ts, tsData)
 forecast_df <- left_join(forecast_df, naive_df, by = "date")
 
 # plot results -----------------------------------
@@ -93,7 +94,7 @@ tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl"
 
 plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) +
   geom_line() +
-  scale_color_manual(values = c("blue", "black")) +
+  scale_color_manual(values = c("blue", "black", "red")) +
   theme_minimal() +
   labs(
     title = "Forecasted monthly inflation",
@@ -102,7 +103,6 @@ plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) 
     y = "Inflation"
   )
 
-plot_fc
 plot_all
 
 #export ------------------------------------------
