@@ -70,21 +70,23 @@ toc()
 
 y_pred <- ts(forecasts_rf, start = c(2000, 1), frequency = 12)
 
+accuracy(y_pred, tsData)
+
 forest_pred_df <- as.data.frame(y_pred) %>% 
   select(forest = x) %>% 
-  mutate(date = seq(as.Date("2019/1/1"), as.Date("2019/12/1"), "month")
+  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month")
   )
 
 forecast_df <- left_join(values_df, forest_pred_df, by = "date")
 # naive model ------------------------------------
-naive_df <- values_df %>% 
-  filter(year == 2018) %>% 
-  select(date, infl) %>% 
-  mutate(new_date = date + 365) %>% 
-  select(date = new_date, naive = infl)
-
-naive_ts <- ts(naive_df$naive, start = c(2019, 1), frequency = 12)
-forecast_df <- left_join(forecast_df, naive_df, by = "date")
+# naive_df <- values_df %>% 
+#   filter(year == 2018) %>% 
+#   select(date, infl) %>% 
+#   mutate(new_date = date + 365) %>% 
+#   select(date = new_date, naive = infl)
+# 
+# naive_ts <- ts(naive_df$naive, start = c(2019, 1), frequency = 12)
+# forecast_df <- left_join(forecast_df, naive_df, by = "date")
 
 # plot results -----------------------------------
 plot_fc <- forecast_df %>% 
@@ -126,5 +128,7 @@ names(rmse) <- c("ets", "arima", "forest", "naive")
 rmse["forest"]/rmse["naive"]
 rmse["arima"]/rmse["naive"]
 rmse["ets"]/rmse["naive"]
+
+
 #export ------------------------------------------
-write_rds(forecast_df, paste0(thesis,"forest_naive_2019_4year_forecast.rds"))
+write_rds(forest_pred_df, paste0(export,"forest_expanding_horizon.rds"))
