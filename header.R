@@ -9,7 +9,7 @@ library(tsibble)
 library(tidyr)
 library(lubridate)
 library(tictoc)
-# library(vars)
+library(vars)
 library(dplyr)
 
 thesis <- paste0(getwd(),"/")

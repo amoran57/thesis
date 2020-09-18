@@ -7,7 +7,7 @@ df <- read_rds(paste0(export, "master_data.rds"))
 
 values_df <- df %>% 
   filter(year >= 1962) %>% 
-  dplyr::select(date, infl, rate10yr, unemp, nat_unemp)
+  dplyr::select(date, infl, rate10yr, unemp, nat_unemp, year)
 
 
 tsData <- ts(values_df$infl, start = c(1962,1), frequency = 12)
@@ -16,14 +16,15 @@ tsData <- ts(values_df$infl, start = c(1962,1), frequency = 12)
 monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
 var_pred <- c()
 
+tic("var")
 for (monthx in monthly_dates) {
   df_train <- values_df %>% 
     filter(date <= monthx) %>% 
-    dplyr::select(-date)
+    dplyr::select(-date, -year)
   
   df_train_ts <- ts(df_train, start = c(1962, 1), frequency = 12)
   
-  model <- VAR(df_train_ts, lag.max = 12, ic = "AIC")
+  model <- VAR(df_train_ts, lag.max = 6, ic = "AIC", type = "both")
   
   
   prediction <- predict(model, n.ahead = 12)
@@ -34,6 +35,7 @@ for (monthx in monthly_dates) {
   
   var_pred <- c(var_pred, value)
 }
+toc()
 
 
 y_pred <- ts(var_pred, start = c(2000, 1), frequency = 12)
@@ -42,15 +44,15 @@ accuracy(y_pred, tsData)
 
 
 pred_df <- as.data.frame(y_pred) %>% 
-  select(var = x) %>% 
-  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month")
+  dplyr::select(var = x) %>% 
+  mutate(date = seq(as.Date("2000/1/1"), as.Date("2020/1/1"), "month")
   )
 
 forecast_df <- left_join(values_df, pred_df, by = "date")
 # naive model ------------------------------------
 naive_forecast <- window(tsData, start = c(1999, 1), end = c(2018, 12))
 naive_df <- as.data.frame(naive_forecast) %>% 
-  select(naive = x) %>% 
+  dplyr::select(naive = x) %>% 
   mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month"))
 
 naive_ts <- ts(naive_df$naive, start = c(2000, 1), frequency = 12)
