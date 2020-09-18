@@ -50,7 +50,7 @@ for (monthx in monthly_dates) {
   # here is where we reshape the training data to reflect the time distance
   # corresponding to the current forecast horizon.
   y_train <- y_train[-c(1:11)] 
-  X_train <- X_train[-c((nrow(X_train) - 11):nrow(X_train)), ] 
+  X_train <- X_train[-c((nrow(X_train) - 10):nrow(X_train)), ] 
 
     set.seed(1960)
     # fit the model
@@ -70,7 +70,7 @@ accuracy(y_pred, tsData)
 
 forest_pred_df <- as.data.frame(y_pred) %>% 
   select(forest = x) %>% 
-  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month")
+  mutate(date = seq(as.Date("2000/1/1"), as.Date("2020/1/1"), "month")
   )
 
 forecast_df <- left_join(values_df, forest_pred_df, by = "date")
