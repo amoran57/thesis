@@ -16,21 +16,27 @@ tsData <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
 naive_forecast <- window(tsData, start = c(1999, 1), end = c(2018, 12))
 naive_df <- as.data.frame(naive_forecast) %>% 
   dplyr::select(naive = x) %>% 
-  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month"))
+  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month"),
+         naive = base::as.numeric(naive))
 
 infl_df <- as.data.frame(tsData) %>% 
   dplyr::select(infl = x) %>% 
   mutate(date = seq(as.Date("1959/1/1"), as.Date("2020/8/1"), "month"))
 
-forecast_df <- infl_df %>% left_join(arima) %>% left_join(forest) %>% left_join(var) %>% left_join(naive) 
+forecast_df <- infl_df %>% left_join(arima) %>% left_join(forest) %>% left_join(var) %>% 
+  dplyr::select(date, everything())
+forecast_df <- left_join(forecast_df, naive) 
 
 # plot results -----------------------------------
-tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl":"naive") %>%
+tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl":"var") %>% 
+  mutate(year = lubridate::year(date)) %>% 
   filter(year > 1999 & year < 2020)
+
+cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) +
   geom_line() +
-  scale_color_manual(values = c("blue", "black", "red", "green", "gray")) +
+  scale_color_manual(values = c("purple4", "darkgreen", "black", "red", "gray")) +
   theme_minimal() +
   labs(
     title = "Forecasted monthly inflation",
