@@ -12,18 +12,16 @@ values_df <- df %>%
 tsData <- ts(values_df$infl, start = c(1959,1), frequency = 12)
 
 #random forest method --------------------------------------
-yearly_dates <- seq(as.Date("2000/1/1"), as.Date("2019/1/1"), "year")
-test_vector <- c()
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
 lag_order <- 48
-horizon <- 12
-
 forecasts_rf <- c()
 
 tic("expanding horizon forest")
-for (yearx in yearly_dates) {
+
+for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
-    filter(date < yearx)
+    filter(date < monthx)
   train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
 
   infl_mbd <- embed(train_tsData, lag_order + 1)
@@ -32,7 +30,7 @@ for (yearx in yearly_dates) {
   #add other variables
   other_vars_lag_order <- 12
   other_vars <- df %>% 
-    filter(date >= as.Date("1962-01-01") & date < yearx) %>% 
+    filter(date >= as.Date("1962-01-01") & date < monthx) %>% 
     select(-c(date, infl, infl_na, rate12month, spread, survey, year))
   other_vars <- other_vars[-nrow(other_vars),]
   
@@ -49,26 +47,24 @@ for (yearx in yearly_dates) {
   X_train <- infl_mbd[,-1]
   X_test <- infl_mbd[nrow(infl_mbd), c(1:(lag_order + 12*length(names(other_vars)) + 1))]
   
-  temp_forecasts_rf <- numeric(horizon)
-  
-  for (i in 1:horizon){
+  # here is where we reshape the training data to reflect the time distance
+  # corresponding to the current forecast horizon.
+  y_train <- y_train[-c(1:11)] 
+  X_train <- X_train[-c((nrow(X_train) - 11):nrow(X_train)), ] 
+
     set.seed(1960)
     # fit the model
     fit_rf <- randomForest(X_train, y_train)
     # predict using the test set
-    temp_forecasts_rf[i] <- predict(fit_rf, X_test)
-    # here is where we repeatedly reshape the training data to reflect the time distance
-    # corresponding to the current forecast horizon.
-    y_train <- y_train[-1] 
-    X_train <- X_train[-nrow(X_train), ] 
-  }
+    predict_rf <- predict(fit_rf, X_test)
+
+  forecasts_rf <- c(forecasts_rf, predict_rf)
   
-  forecasts_rf <- c(forecasts_rf, temp_forecasts_rf)
   }
 toc()
 
 
-y_pred <- ts(forecasts_rf, start = c(2000, 1), frequency = 12)
+y_pred <- ts(forecasts_rf, start = c(1999, 12), frequency = 12)
 
 accuracy(y_pred, tsData)
 

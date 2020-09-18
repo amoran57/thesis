@@ -8,5 +8,7 @@ install.packages(c("dplyr",
                    "tsibble",
                    "randomForest",
                    "tictoc",
-                   "readr"))
+                   "readr",
+                   "vars"
+                   ))
                  

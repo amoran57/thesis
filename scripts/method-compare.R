@@ -5,7 +5,7 @@ header <- source("header.R")
 #Code ------------------------------------------
 #import data
 df <- read_rds(paste0(export, "master_data.rds"))
-
+forest <- read_rds(paste0(export, "forest_expanding_horizon.rds"))
 values_df <- df %>% 
   dplyr::filter(year >= 1959)
 

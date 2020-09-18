@@ -4,55 +4,55 @@ header <- source("header.R")
 
 #Import ------------------------------------------
 infl <- read.csv(paste0(import, "CPIAUCSL.csv")) %>% 
-  select(date = DATE, cpi = CPIAUCSL) %>% 
+  dplyr::select(date = DATE, cpi = CPIAUCSL) %>% 
   mutate(date = as.Date(date),
          l_cpi = log(cpi),
          l_cpi_1 = dplyr::lag(l_cpi),
          infl = l_cpi - l_cpi_1) %>% 
-  select(date, infl)
+  dplyr::select(date, infl)
 
 infl_na <- read.csv(paste0(import, "CPIAUCNS.csv")) %>% 
-  select(date = DATE, cpi = CPIAUCNS) %>% 
+  dplyr::select(date = DATE, cpi = CPIAUCNS) %>% 
   mutate(date = as.Date(date),
          l_cpi = log(cpi),
          l_cpi_1 = dplyr::lag(l_cpi),
          infl_na = l_cpi -l_cpi_1) %>% 
-  select(date, infl_na)
+  dplyr::select(date, infl_na)
 
 rate10yr <- read.csv(paste0(import, "DGS10.csv")) %>% 
-  select(date = DATE, rate10yr = DGS10) %>% 
+  dplyr::select(date = DATE, rate10yr = DGS10) %>% 
   mutate(date = as.Date(date), rate10yr = base::as.numeric(rate10yr))
 
 rate3month <- read.csv(paste0(import, "TB3MS.csv")) %>% 
-  select(date = DATE, rate3month = TB3MS) %>% 
+  dplyr::select(date = DATE, rate3month = TB3MS) %>% 
   mutate(date = as.Date(date)) 
 
 rate12month <- read.csv(paste0(import, "TB1YR.csv")) %>% 
-  select(date = DATE, rate12month = TB1YR) %>% 
-  mutate(date = as.Date(date)) 
+  dplyr::select(date = DATE, rate12month = TB1YR) %>% 
+  mutate(date = as.Date(date), rate12month = base::as.numeric(rate12month))
 
 unemp <- read.csv(paste0(import, "UNRATE.csv")) %>% 
-  select(date = DATE, unemp = UNRATE) %>% 
+  dplyr::select(date = DATE, unemp = UNRATE) %>% 
   mutate(date = as.Date(date))
 
 unemp_na <- read.csv(paste0(import, "UNRATENSA.csv")) %>% 
-  select(date = DATE, unemp_na = UNRATENSA) %>% 
+  dplyr::select(date = DATE, unemp_na = UNRATENSA) %>% 
   mutate(date = as.Date(date))
 
 nat_unemp <- read.csv(paste0(import, "NROU.csv")) %>% 
-  select(date = DATE, nat_unemp = NROU) %>% 
+  dplyr::select(date = DATE, nat_unemp = NROU) %>% 
   mutate(date = as.Date(date))
 
 nat_unemp_short <- read.csv(paste0(import, "NROUST.csv")) %>% 
-  select(date = DATE, nat_unemp_short = NROUST) %>% 
+  dplyr::select(date = DATE, nat_unemp_short = NROUST) %>% 
   mutate(date = as.Date(date))
 
 spread <- read.csv(paste0(import, "T10YIE.csv")) %>% 
-  select(date = DATE, spread = T10YIE) %>% 
-  mutate(date = as.Date(date))
+  dplyr::select(date = DATE, spread = T10YIE) %>% 
+  mutate(date = as.Date(date), spread = base::as.numeric(spread))
 
 survey <- read.csv(paste0(import, "MICH.csv")) %>% 
-  select(date = DATE, survey = MICH) %>% 
+  dplyr::select(date = DATE, survey = MICH) %>% 
   mutate(date = as.Date(date))
 
 #Clean ------------------------------------------
