@@ -15,6 +15,7 @@ tsData <- ts(values_df$infl, start = c(1959,1), frequency = 12)
 monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
 pred_arima <- c()
 
+tic("arima")
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
@@ -25,7 +26,6 @@ for (monthx in monthly_dates) {
   
   pred_arima <- c(pred_arima, pred_a)
 }
-
 toc()
 
 y_pred <- ts(pred_arima, start = c(2000, 1), frequency = 12)
@@ -34,7 +34,7 @@ accuracy(y_pred, tsData)
 
 pred_df <- as.data.frame(y_pred) %>% 
   select(arima = x) %>% 
-  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month")
+  mutate(date = seq(as.Date("2000/1/1"), as.Date("2020/1/1"), "month")
   )
 
 forecast_df <- left_join(values_df, pred_df, by = "date")
