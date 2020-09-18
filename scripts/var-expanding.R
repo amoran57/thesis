@@ -3,42 +3,50 @@ rm(list=ls())
 header <- source("header.R")
 
 #Code ------------------------------------------
-#import data
-df <- read_rds(paste0(export, "master_data.rds"))
+df <- read_rds(paste0(export, "master_data.rds")) 
 
 values_df <- df %>% 
-  dplyr::filter(year >= 1959)
+  filter(year >= 1962) %>% 
+  dplyr::select(date, infl, rate10yr, unemp, nat_unemp)
 
-tsData <- ts(values_df$infl, start = c(1959,1), frequency = 12)
 
-#rolling horizon forecast by auto.arima --------------------
+tsData <- ts(values_df$infl, start = c(1962,1), frequency = 12)
+
+#Set model ----------------------------------
 monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
-pred_arima <- c()
+var_pred <- c()
 
-tic("arima")
 for (monthx in monthly_dates) {
-  #initialize training data according to expanding horizon
-  train_df <- values_df %>% 
-    filter(date <= monthx)
-  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
-
-  pred_a <- forecast(auto.arima(train_tsData), 12)$mean[12]
+  df_train <- values_df %>% 
+    filter(date <= monthx) %>% 
+    dplyr::select(-date)
   
-  pred_arima <- c(pred_arima, pred_a)
+  df_train_ts <- ts(df_train, start = c(1962, 1), frequency = 12)
+  
+  model <- VAR(df_train_ts, lag.max = 12, ic = "AIC")
+  
+  
+  prediction <- predict(model, n.ahead = 12)
+  prediction <- prediction$fcst
+  prediction <- as.data.frame(prediction) %>% 
+    dplyr::select(infl = infl.fcst)
+  value <- prediction[12,]
+  
+  var_pred <- c(var_pred, value)
 }
-toc()
 
-y_pred <- ts(pred_arima, start = c(2000, 1), frequency = 12)
+
+y_pred <- ts(var_pred, start = c(2000, 1), frequency = 12)
 
 accuracy(y_pred, tsData)
 
+
 pred_df <- as.data.frame(y_pred) %>% 
-  select(arima = x) %>% 
-  mutate(date = seq(as.Date("2000/1/1"), as.Date("2020/1/1"), "month")
+  select(var = x) %>% 
+  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month")
   )
 
 forecast_df <- left_join(values_df, pred_df, by = "date")
-
 # naive model ------------------------------------
 naive_forecast <- window(tsData, start = c(1999, 1), end = c(2018, 12))
 naive_df <- as.data.frame(naive_forecast) %>% 
@@ -49,9 +57,8 @@ naive_ts <- ts(naive_df$naive, start = c(2000, 1), frequency = 12)
 accuracy(naive_ts, tsData)
 forecast_df <- left_join(forecast_df, naive_df, by = "date")
 
-
 # plot results -----------------------------------
-tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl", "arima", "naive") %>%
+tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl", "var", "naive") %>%
   filter(year > 1999 & year < 2020)
 
 plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) +
@@ -68,5 +75,6 @@ plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) 
 plot_all
 
 #export ------------------------------------------
-write_rds(pred_df, paste0(export,"arima_expanding_horizon.rds"))
+write_rds(pred_df, paste0(export,"var_expanding_horizon.rds"))
+
 
