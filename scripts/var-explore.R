@@ -3,30 +3,78 @@ rm(list=ls())
 header <- source("header.R")
 
 #Code ------------------------------------------
-df <- read_rds(paste0(export, "master_data.rds")) %>% 
+df <- read_rds(paste0(export, "master_data.rds")) 
+
+values_df <- df %>% 
   filter(year >= 1962) %>% 
-  dplyr::select(infl, rate10yr, unemp, nat_unemp, year)
+  dplyr::select(date, infl, rate10yr, unemp, nat_unemp)
 
-df_train <- df %>% 
-  filter(year <= 2018)
 
-df <- df %>% 
-  dplyr::select(-year)
-
-infl_ts <- ts(df$infl, start = c(1962, 1), frequency = 12)
-df_ts <- ts(df, start = c(1962, 1), frequency = 12)
-df_train_ts <- ts(df_train, start = c(1962, 1), frequency = 12)
+tsData <- ts(values_df$infl, start = c(1962,1), frequency = 12)
 
 #Set model ----------------------------------
-model <- VAR(df_ts)
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
+var_pred <- c()
 
-prediction <- predict(model, n.ahead = 12)
-prediction <- prediction$fcst
-prediction <- as.data.frame(prediction) %>% 
-  dplyr::select(infl = infl.fcst)
+for (monthx in monthly_dates) {
+  df_train <- values_df %>% 
+    filter(date <= monthx) %>% 
+    dplyr::select(-date)
+  
+  df_train_ts <- ts(df_train, start = c(1962, 1), frequency = 12)
+  
+  model <- VAR(df_train_ts, lag.max = 12, ic = "AIC")
+  
+  
+  prediction <- predict(model, n.ahead = 12)
+  prediction <- prediction$fcst
+  prediction <- as.data.frame(prediction) %>% 
+    dplyr::select(infl = infl.fcst)
+  value <- prediction[12,]
+  
+  var_pred <- c(var_pred, value)
+}
 
-pred_ts <- ts(prediction, start = c(2019, 1), frequency = 12)
-accuracy(pred_ts, infl_ts)
 
+y_pred <- ts(var_pred, start = c(2000, 1), frequency = 12)
+
+accuracy(y_pred, tsData)
+
+
+pred_df <- as.data.frame(y_pred) %>% 
+  select(var = x) %>% 
+  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month")
+  )
+
+forecast_df <- left_join(values_df, pred_df, by = "date")
+# naive model ------------------------------------
+naive_forecast <- window(tsData, start = c(1999, 1), end = c(2018, 12))
+naive_df <- as.data.frame(naive_forecast) %>% 
+  select(naive = x) %>% 
+  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month"))
+
+naive_ts <- ts(naive_df$naive, start = c(2000, 1), frequency = 12)
+accuracy(naive_ts, tsData)
+forecast_df <- left_join(forecast_df, naive_df, by = "date")
+
+# plot results -----------------------------------
+tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl", "var", "naive") %>%
+  filter(year > 1999 & year < 2020)
+
+plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) +
+  geom_line() +
+  scale_color_manual(values = c("blue", "black", "red")) +
+  theme_minimal() +
+  labs(
+    title = "Forecasted monthly inflation",
+    subtitle = "Predicted for 2000-2019 given 1959-2018 data",
+    x = "Date",
+    y = "Inflation"
+  )
+
+plot_all
+
+#export ------------------------------------------
+write_rds(pred_df, paste0(export,"var_expanding_horizon.rds"))
 
 
