@@ -21,7 +21,7 @@ tic("expanding horizon forest")
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
-    filter(date < monthx)
+    filter(date <= monthx)
   train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
 
   infl_mbd <- embed(train_tsData, lag_order + 1)
@@ -64,7 +64,7 @@ for (monthx in monthly_dates) {
 toc()
 
 
-y_pred <- ts(forecasts_rf, start = c(1999, 12), frequency = 12)
+y_pred <- ts(forecasts_rf, start = c(2000, 1), frequency = 12)
 
 accuracy(y_pred, tsData)
 
