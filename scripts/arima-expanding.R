@@ -38,15 +38,15 @@ for (monthx in monthly_dates) {
   if (horizon == 3) {
     pred_arima <- pred_arima %>% 
       dplyr::mutate(date = seq(as.Date("1999-04-01"), as.Date("2019-04-01"), "month")) %>% 
-      dplyr::select(month3 = prediction, date)
+      dplyr::select(arima_month3 = prediction, date)
   } else if (horizon == 6) {
     pred_arima <- pred_arima %>% 
       dplyr::mutate(date = seq(as.Date("1999-07-01"), as.Date("2019-07-01"), "month")) %>% 
-      dplyr::select(month6 = prediction, date)
+      dplyr::select(arima_month6 = prediction, date)
   } else if (horizon == 12) {
     pred_arima <- pred_arima %>% 
       dplyr::mutate(date = seq(as.Date("2000-01-01"), as.Date("2020-01-01"), "month")) %>% 
-      dplyr::select(month12 = prediction, date)
+      dplyr::select(arima_month12 = prediction, date)
   }
   
   all_forecasts <- dplyr::left_join(all_forecasts, pred_arima, by = "date")
@@ -56,5 +56,5 @@ toc()
 
 
 #export ------------------------------------------
-write_rds(pred_df, paste0(all_forecasts,"arima_expanding_horizon.rds"))
+write_rds(all_forecasts, paste0(export,"arima_expanding_horizon.rds"))
 
