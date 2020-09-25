@@ -23,12 +23,12 @@ infl_df <- as.data.frame(tsData) %>%
   dplyr::select(infl = x) %>% 
   mutate(date = seq(as.Date("1959/1/1"), as.Date("2020/8/1"), "month"))
 
-forecast_df <- infl_df %>% left_join(arima) %>% left_join(forest) %>% left_join(var) %>% 
+forecast_df <- infl_df %>% left_join(arima) %>% left_join(forest) %>% left_join(var) %>% left_join(naive_df) %>% 
   dplyr::select(date, everything())
-forecast_df <- left_join(forecast_df, naive) 
+
 
 # plot results -----------------------------------
-tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl":"var") %>% 
+tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl":"naive") %>% 
   mutate(year = lubridate::year(date)) %>% 
   filter(year > 1999 & year < 2020)
 

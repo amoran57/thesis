@@ -15,9 +15,14 @@ tsData <- ts(values_df$infl, start = c(1959,1), frequency = 12)
 monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
 lag_order <- 48
 forecasts_rf <- c()
+all_forecasts <- seq(as.Date("1999/4/1"), as.Date("2020/1/1"), "month")
+all_forecasts <- as.data.frame(all_forecasts)
+names(all_forecasts) <- c("date")
+horizons <- c(3, 6, 12)
+
 
 tic("expanding horizon forest")
-
+for (horizon in horizons) {
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
@@ -49,8 +54,8 @@ for (monthx in monthly_dates) {
   
   # here is where we reshape the training data to reflect the time distance
   # corresponding to the current forecast horizon.
-  y_train <- y_train[-c(1:11)] 
-  X_train <- X_train[-c((nrow(X_train) - 10):nrow(X_train)), ] 
+  y_train <- y_train[-c(1:(horizon - 1))] 
+  X_train <- X_train[-c((nrow(X_train) - (horizon - 2)):nrow(X_train)), ] 
 
     set.seed(1960)
     # fit the model
@@ -60,46 +65,29 @@ for (monthx in monthly_dates) {
 
   forecasts_rf <- c(forecasts_rf, predict_rf)
   
+}
+  forecasts_rf <- as.data.frame(forecasts_rf)
+  names(forecasts_rf) <- c("prediction")
+  if (horizon == 3) {
+  forecast_rf <- forecast_rf %>% 
+    dplyr::mutate(date = seq(as.Date("1999-04-01"), as.Date("2019-04-01"), "month")) %>% 
+    dplyr::select(month3 = prediction, date)
+  } else if (horizon == 6) {
+    forecast_rf <- forecast_rf %>% 
+      dplyr::mutate(date = seq(as.Date("1999-07-01"), as.Date("2019-07-01"), "month")) %>% 
+      dplyr::select(month6 = prediction, date)
+  } else if (horizon == 12) {
+    forecast_rf <- forecast_rf %>% 
+      dplyr::mutate(date = seq(as.Date("2000-01-01"), as.Date("2020-01-01"), "month")) %>% 
+      dplyr::select(month12 = prediction, date)
   }
+  
+  all_forecasts <- dplyr::left_join(all_forecasts, forecast_rf, by = "date")
+  
+}
 toc()
 
 
-y_pred <- ts(forecasts_rf, start = c(2000, 1), frequency = 12)
-
-accuracy(y_pred, tsData)
-
-forest_pred_df <- as.data.frame(y_pred) %>% 
-  select(forest = x) %>% 
-  mutate(date = seq(as.Date("2000/1/1"), as.Date("2020/1/1"), "month")
-  )
-
-forecast_df <- left_join(values_df, forest_pred_df, by = "date")
-# naive model ------------------------------------
-naive_forecast <- window(tsData, start = c(1999, 1), end = c(2018, 12))
-naive_df <- as.data.frame(naive_forecast) %>% 
-  select(naive = x) %>% 
-  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month"))
-
-naive_ts <- ts(naive_df$naive, start = c(2000, 1), frequency = 12)
-accuracy(naive_ts, tsData)
-forecast_df <- left_join(forecast_df, naive_df, by = "date")
-
-# plot results -----------------------------------
-tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl", "forest", "naive") %>%
-  filter(year > 1999 & year < 2020)
-
-plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) +
-  geom_line() +
-  scale_color_manual(values = c("blue", "black", "red")) +
-  theme_minimal() +
-  labs(
-    title = "Forecasted monthly inflation",
-    subtitle = "Predicted for 2000-2019 given 1959-2018 data",
-    x = "Date",
-    y = "Inflation"
-  )
-
-plot_all
 
 #export ------------------------------------------
-write_rds(forest_pred_df, paste0(export,"forest_expanding_horizon.rds"))
+write_rds(all_forecasts, paste0(export,"forest_expanding_horizon.rds"))
