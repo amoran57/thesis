@@ -26,15 +26,32 @@ infl_df <- as.data.frame(tsData) %>%
 forecast_df <- infl_df %>% left_join(arima) %>% left_join(forest) %>% left_join(var) %>% left_join(naive_df) %>% 
   dplyr::select(date, everything())
 
+forecast_month3 <- forecast_df %>% 
+  dplyr::select(date, ends_with("month3"))
+
+forecast_month6 <- forecast_df %>% 
+  dplyr::select(date, ends_with("month6"))
+
+forecast_month12 <- forecast_df %>% 
+  dplyr::select(date, ends_with("month12"))
+  
 
 # plot results -----------------------------------
-tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl":"naive") %>% 
+tidy_forecast_month3 <- gather(data = forecast_month3, key = "key", value = "value", "infl":"naive") %>% 
+  mutate(year = lubridate::year(date)) %>% 
+  filter(year > 1999 & year < 2020)
+
+tidy_forecast_month6 <- gather(data = forecast_month6, key = "key", value = "value", "infl":"naive") %>% 
+  mutate(year = lubridate::year(date)) %>% 
+  filter(year > 1999 & year < 2020)
+
+tidy_forecast_month12 <- gather(data = forecast_month12, key = "key", value = "value", "infl":"naive") %>% 
   mutate(year = lubridate::year(date)) %>% 
   filter(year > 1999 & year < 2020)
 
 cbbPalette <- c("#000000", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
-plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) +
+plot_month3 <- ggplot(data = tidy_forecast_month3, aes(x = date, y = value, color = key)) +
   geom_line() +
   scale_color_manual(values = c("purple4", "darkgreen", "black", "red", "gray")) +
   theme_minimal() +
@@ -45,7 +62,31 @@ plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) 
     y = "Inflation"
   )
 
-plot_all
+plot_month6 <- ggplot(data = tidy_forecast_month6, aes(x = date, y = value, color = key)) +
+  geom_line() +
+  scale_color_manual(values = c("purple4", "darkgreen", "black", "red", "gray")) +
+  theme_minimal() +
+  labs(
+    title = "Forecasted monthly inflation",
+    subtitle = "Predicted for 2000-2019 given 1959-2018 data",
+    x = "Date",
+    y = "Inflation"
+  )
+
+plot_month12 <- ggplot(data = tidy_forecast_month12, aes(x = date, y = value, color = key)) +
+  geom_line() +
+  scale_color_manual(values = c("purple4", "darkgreen", "black", "red", "gray")) +
+  theme_minimal() +
+  labs(
+    title = "Forecasted monthly inflation",
+    subtitle = "Predicted for 2000-2019 given 1959-2018 data",
+    x = "Date",
+    y = "Inflation"
+  )
+
+plot_month3
+plot_month6
+plot_month12
 
 #export ------------------------------------------
 write_rds(forecast_df, paste0(export,"forecast_expanding_horizon.rds"))
