@@ -23,6 +23,7 @@ horizons <- c(3, 6, 12)
 
 tic("expanding horizon forest")
 for (horizon in horizons) {
+  forecasts_rf <- c()
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
@@ -42,7 +43,7 @@ for (monthx in monthly_dates) {
   #add other variables to embedded matrix
   for (var in names(other_vars)) {
     var_ts <- ts(other_vars[var], start = c(1962, 1), frequency = 12)
-    var_mbd <- embed(var_ts, other_vars_lag_order)
+    var_mbd <- embed(var_ts, (other_vars_lag_order - 1))
     var_mbd <- as.data.frame(var_mbd)
     infl_mbd <- cbind(infl_mbd, var_mbd)
   }
@@ -50,7 +51,7 @@ for (monthx in monthly_dates) {
   #set initial training and test sets
   y_train <- infl_mbd[,1]
   X_train <- infl_mbd[,-1]
-  X_test <- infl_mbd[nrow(infl_mbd), c(1:(lag_order + 12*length(names(other_vars)) + 1))]
+  X_test <- infl_mbd[nrow(infl_mbd), c(1:(lag_order + 11*length(names(other_vars)) + 1))]
   
   # here is where we reshape the training data to reflect the time distance
   # corresponding to the current forecast horizon.
@@ -69,23 +70,29 @@ for (monthx in monthly_dates) {
   forecasts_rf <- as.data.frame(forecasts_rf)
   names(forecasts_rf) <- c("prediction")
   if (horizon == 3) {
-  forecast_rf <- forecast_rf %>% 
+  forecasts_rf <- forecasts_rf %>% 
     dplyr::mutate(date = seq(as.Date("1999-04-01"), as.Date("2019-04-01"), "month")) %>% 
     dplyr::select(month3 = prediction, date)
   } else if (horizon == 6) {
-    forecast_rf <- forecast_rf %>% 
+    forecasts_rf <- forecasts_rf %>% 
       dplyr::mutate(date = seq(as.Date("1999-07-01"), as.Date("2019-07-01"), "month")) %>% 
       dplyr::select(month6 = prediction, date)
   } else if (horizon == 12) {
-    forecast_rf <- forecast_rf %>% 
+    forecasts_rf <- forecasts_rf %>% 
       dplyr::mutate(date = seq(as.Date("2000-01-01"), as.Date("2020-01-01"), "month")) %>% 
       dplyr::select(month12 = prediction, date)
   }
   
-  all_forecasts <- dplyr::left_join(all_forecasts, forecast_rf, by = "date")
+  all_forecasts <- dplyr::left_join(all_forecasts, forecasts_rf, by = "date")
   
 }
 toc()
+
+all_forecasts <- all_forecasts %>% 
+  dplyr::select(date, 
+                forest_month3 = month3, 
+                forest_month6 = month6, 
+                forest_month12 = month12)
 
 
 
