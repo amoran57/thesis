@@ -15,8 +15,14 @@ tsData <- ts(values_df$infl, start = c(1962,1), frequency = 12)
 #Set model ----------------------------------
 monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
 var_pred <- c()
+all_forecasts <- seq(as.Date("1999/4/1"), as.Date("2020/1/1"), "month")
+all_forecasts <- as.data.frame(all_forecasts)
+names(all_forecasts) <- c("date")
+horizons <- c(3, 6, 12)
 
 tic("var")
+for (horizon in horizons) {
+  var_pred <- c()
 for (monthx in monthly_dates) {
   df_train <- values_df %>% 
     filter(date <= monthx) %>% 
@@ -27,56 +33,38 @@ for (monthx in monthly_dates) {
   model <- VAR(df_train_ts, lag.max = 6, ic = "AIC", type = "both")
   
   
-  prediction <- predict(model, n.ahead = 12)
+  prediction <- predict(model, n.ahead = horizon)
   prediction <- prediction$fcst
   prediction <- as.data.frame(prediction) %>% 
     dplyr::select(infl = infl.fcst)
-  value <- prediction[12,]
+  value <- prediction[horizon,]
   
   var_pred <- c(var_pred, value)
+}
+  
+  var_pred <- as.data.frame(var_pred)
+  names(var_pred) <- c("prediction")
+  if (horizon == 3) {
+    var_pred <- var_pred %>% 
+      dplyr::mutate(date = seq(as.Date("1999-04-01"), as.Date("2019-04-01"), "month")) %>% 
+      dplyr::select(month3 = prediction, date)
+  } else if (horizon == 6) {
+    var_pred <- var_pred %>% 
+      dplyr::mutate(date = seq(as.Date("1999-07-01"), as.Date("2019-07-01"), "month")) %>% 
+      dplyr::select(month6 = prediction, date)
+  } else if (horizon == 12) {
+    var_pred <- var_pred %>% 
+      dplyr::mutate(date = seq(as.Date("2000-01-01"), as.Date("2020-01-01"), "month")) %>% 
+      dplyr::select(month12 = prediction, date)
+  }
+  
+  all_forecasts <- dplyr::left_join(all_forecasts, var_pred, by = "date")
+  
 }
 toc()
 
 
-y_pred <- ts(var_pred, start = c(2000, 1), frequency = 12)
-
-accuracy(y_pred, tsData)
-
-
-pred_df <- as.data.frame(y_pred) %>% 
-  dplyr::select(var = x) %>% 
-  mutate(date = seq(as.Date("2000/1/1"), as.Date("2020/1/1"), "month")
-  )
-
-forecast_df <- left_join(values_df, pred_df, by = "date")
-# naive model ------------------------------------
-naive_forecast <- window(tsData, start = c(1999, 1), end = c(2018, 12))
-naive_df <- as.data.frame(naive_forecast) %>% 
-  dplyr::select(naive = x) %>% 
-  mutate(date = seq(as.Date("2000/1/1"), as.Date("2019/12/1"), "month"))
-
-naive_ts <- ts(naive_df$naive, start = c(2000, 1), frequency = 12)
-accuracy(naive_ts, tsData)
-forecast_df <- left_join(forecast_df, naive_df, by = "date")
-
-# plot results -----------------------------------
-tidy_forecast <- gather(data = forecast_df, key = "key", value = "value", "infl", "var", "naive") %>%
-  filter(year > 1999 & year < 2020)
-
-plot_all <- ggplot(data = tidy_forecast, aes(x = date, y = value, color = key)) +
-  geom_line() +
-  scale_color_manual(values = c("blue", "black", "red")) +
-  theme_minimal() +
-  labs(
-    title = "Forecasted monthly inflation",
-    subtitle = "Predicted for 2000-2019 given 1959-2018 data",
-    x = "Date",
-    y = "Inflation"
-  )
-
-plot_all
-
 #export ------------------------------------------
-write_rds(pred_df, paste0(export,"var_expanding_horizon.rds"))
+write_rds(all_forecasts, paste0(export,"var_expanding_horizon.rds"))
 
 
