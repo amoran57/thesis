@@ -92,8 +92,6 @@ for (monthx in monthly_dates) {
 toc()
 
 
-
-
 #export ------------------------------------------
 write_rds(all_forecasts, paste0(export,"forest_expanding_horizon.rds"))
 write_rds(models, paste0(export, "forest_models_list.rds"))
