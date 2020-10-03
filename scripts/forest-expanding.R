@@ -20,11 +20,14 @@ all_forecasts <- as.data.frame(all_forecasts)
 names(all_forecasts) <- c("date")
 horizons <- c(3, 6, 12)
 
+models <- list()
+i <- 0
 
 tic("expanding horizon forest")
 for (horizon in horizons) {
   forecasts_rf <- c()
 for (monthx in monthly_dates) {
+  i <- (i + 1)
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
     filter(date <= monthx)
@@ -65,7 +68,7 @@ for (monthx in monthly_dates) {
     predict_rf <- predict(fit_rf, X_test)
 
   forecasts_rf <- c(forecasts_rf, predict_rf)
-  
+  models[[i]] <- fit_rf
 }
   forecasts_rf <- as.data.frame(forecasts_rf)
   names(forecasts_rf) <- c("prediction")
@@ -93,3 +96,4 @@ toc()
 
 #export ------------------------------------------
 write_rds(all_forecasts, paste0(export,"forest_expanding_horizon.rds"))
+write_rds(models, paste0(export, "forest_models_list.rds"))
