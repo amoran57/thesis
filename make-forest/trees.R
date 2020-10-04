@@ -3,13 +3,16 @@ rm(list=ls())
 header <- source("header.R")
 
 #Code ------------------------------------------
+# Credit: https://www.statworx.com/blog/coding-regression-trees-in-150-lines-of-code
+
 df <- read_rds(paste0(export, "master_data.rds"))
 
 values_df <- df %>% 
   dplyr::filter(year >= 1959)
 
-tsData <- ts(values_df$infl, start = c(1959,1), frequency = 12)
-
+infl_mbd <- embed(values_df$infl, 12)
+infl_mbd <- as.data.frame(infl_mbd)
+names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
 
 # Regression Tree ---------------------------------------------------------
 sse_var <- function(x, y) {
@@ -153,4 +156,29 @@ reg_tree <- function(formula, data, minsize) {
 
 
 # Get tree ---------------------------------------------
-tree <- reg_tree(infl ~ rate3month + unemp + nat_unemp, values_df, 10)
+one_ten <- as.character(seq(1:10))
+for(i in 1:10) {
+  one_ten[i] <- paste0("tmin", as.character(i))
+}
+ind <- glue::glue_collapse(x = one_ten, " + ")
+call <- paste0("t ~ ", ind)
+call <- as.formula(call)
+tree <- reg_tree(formula = call, data = infl_mbd, 10)
+node <- tree$tree$NODE
+nobs <- tree$tree$NOBS
+filter <- tree$tree$FILTER
+terminal <- tree$tree$TERMINAL
+tree_df <- data.frame(node, nobs, filter, terminal)
+real_tree <- tree_df %>% 
+  filter(terminal == "LEAF")
+pred <- tree$fit
+obs <- seq(1:729)
+infl_mbd <- cbind(infl_mbd, pred, obs)
+trim_infl <- infl_mbd %>% 
+  select(t, pred, obs)
+tidy_infl <- gather(trim_infl, key = "key", value = "value", "t", "pred")
+
+plot <- ggplot(data = tidy_infl, aes(x = obs, y = value, color = key)) +
+  geom_line()
+
+plot
