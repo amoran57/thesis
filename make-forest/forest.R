@@ -9,9 +9,12 @@ values_df <- df %>%
   dplyr::filter(year >= 1959)
 
 infl_mbd <- embed(values_df$infl, 12)
+unemp_mbd <- as.data.frame(embed(values_df$unemp, 6))[-c(1:6),]
 infl_mbd <- as.data.frame(infl_mbd)
 names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
-
+names(unemp_mbd) <- c("un", "unmin1", "unmin2", "unmin3", "unmin4", "unmin5")
+infl_mbd <- cbind(infl_mbd, unemp_mbd)
+rownames(infl_mbd) <- seq(1:nrow(infl_mbd))
 # Random Forest --------------------------------------------
 # Credit: https://www.statworx.com/blog/coding-regression-trees-in-150-lines-of-code
 #Credit: https://www.r-bloggers.com/2019/06/coding-random-forests-in-100-lines-of-code/
@@ -134,15 +137,20 @@ reg_tree <- function(formula, data, minsize) {
   return(list(tree = tree_info, fit = fitted, formula = formula, data = data))
 }
 # define function to sprout a single tree
-sprout_tree <- function(formula, feature_frac, data) {
+sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data) {
   # extract features
   features <- all.vars(formula)[-1]
   # extract target
   target <- all.vars(formula)[1]
+  # extract target data
+  y <- data[, as.character(formula)[2]]
   # bag the data
   # - randomly sample the data with replacement (duplicate are possible)
-  train <-
-    data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
+  if (sample_data == TRUE) {
+    train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
+  } else {
+    train <- data
+  }
   # randomly sample features
   # - only fit the regression tree with feature_frac * 100 % of the features
   features_sample <- sample(features,
@@ -153,15 +161,32 @@ sprout_tree <- function(formula, feature_frac, data) {
     as.formula(paste0(target, " ~ ", paste0(features_sample,
                                             collapse =  " + ")))
   # fit the regression tree
-  tree <- reg_tree(formula = formula_new,
-                   data = train,
-                   minsize = ceiling(nrow(train) * 0.1))
-  # save the fit and the importance
+  if (is.null(minsize)) {
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     minsize = ceiling(nrow(train) * 0.1))
+  } else {
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     minsize = minsize)
+  }
+
+  # calculate fitted values
+  leafs <- tree$tree[tree$tree$TERMINAL == "LEAF", ]
+  fitted <- c()
+  for (i in seq_len(nrow(leafs))) {
+    # extract index
+    ind <- as.numeric(rownames(subset(data, eval(parse(text = leafs[i, "FILTER"])))))
+    # estimator is the mean y value of the leaf
+    fitted[ind] <- mean(y[ind])
+  }
+  
+  tree$new_fit <- fitted
+
+  # return the tree
   return(tree)
 }
-reg_rf <- function(formula, n_trees, feature_frac, data) {
-  forest_df <- data.frame(matrix(ncol = 5, nrow = 0))
-  names(forest_df) <- c("node", "nobs", "filter", "terminal", "tree_num")
+reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
   trees <- plyr::raply(
@@ -169,13 +194,15 @@ reg_rf <- function(formula, n_trees, feature_frac, data) {
     sprout_tree(
       formula = formula,
       feature_frac = feature_frac,
+      sample_data = sample_data,
+      minsize = minsize,
       data = data
     ),
     .progress = "text"
   )
 
   # extract fit
-  fits <- do.call("cbind", trees[, 2])
+  fits <- do.call("cbind", trees[, 5])
   fits <- as.data.frame(fits)
   # calculate the final fit as a mean of all regression trees
   means <- rowMeans(fits, na.rm = TRUE)
@@ -184,23 +211,46 @@ reg_rf <- function(formula, n_trees, feature_frac, data) {
   # return(forest_df)
 }
 
-
-#Use forest ---------------------------------------------
+#Use sprout trees ------------------------------------
 #get formula call
-one_ten <- as.character(seq(1:10))
-for(i in 1:10) {
-  one_ten[i] <- paste0("tmin", as.character(i))
+call <- as.character(seq(1:11))
+for(i in 1:length(call)) {
+  call[i] <- paste0("tmin", as.character(i))
 }
-ind <- glue::glue_collapse(x = one_ten, " + ")
+
+call <- c(call, names(unemp_mbd))
+ind <- glue::glue_collapse(x = call, " + ")
 call <- paste0("t ~ ", ind)
 call <- as.formula(call)
 
+tree <- sprout_tree(formula = call, feature_frac = 1, data = infl_mbd)
+real_tree <- reg_tree(call, infl_mbd, 10)
+#Use forest ---------------------------------------------
 #create forest and trees
-forest <- reg_rf(formula = call, n_trees = 5, feature_frac = 0.7, data = infl_mbd)
+forest <- reg_rf(formula = call, minsize = 10, data = infl_mbd)
 trees <- forest$trees[,1]
 forest_df <- do.call(rbind, trees)
 
-#get leaves, find importance of each variable
+#get and graph fit
+forest_fit <- forest$fit$means
+tree_fit <- tree$new_fit
+real_fit <- real_tree$fit
+real <- infl_mbd$t
+graph <- data.frame(real, forest_fit, real_fit, tree_fit) 
+graph <- graph %>% 
+  dplyr::mutate(obs = seq(1:nrow(graph)))
+tidy_graph <- gather(graph, key = "key", value = "value", "real":"tree_fit")
+
+plot <- ggplot(data = tidy_graph, aes(x = obs, y = value, color = key)) +
+  geom_line()
+
+plot
+
+# get accuracy 
+forest_ts <- ts(forest_fit, start = c(1959, 1), frequency = 12)
+real_ts <- ts(real, start = c(1959, 1), frequency = 12)
+accuracy(forest_ts, real_ts)
+#get leaves, find importance of each variable ----------------------------
 leaves_df <- forest_df %>% 
   filter(TERMINAL == "LEAF") %>% 
   select(-TERMINAL)
@@ -215,3 +265,8 @@ leaves_df <- leaves_df %>%
 sums <- base::colSums(leaves_df, na.rm = TRUE)
 leaves_df <- rbind(leaves_df, sums = sums)
 leaves_df <- cbind(leaves_df, leaf_filters)
+
+
+
+
+
