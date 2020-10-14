@@ -253,9 +253,27 @@ forecast_rf <- function(formula, data, horizon, n_trees = 50, feature_frac = 0.7
                    data = adj_data)
   
   pred <- get_forecast(forest, X_test)
-  
+  return(pred)
 }
-
+ts_forest <- function(lag_order, data) {
+  #get data frame
+  ts_df <- as.data.frame(embed(data, lag_order))
+  names(ts_df) <- as.character(seq(1:length(ts_df)))
+  #get formula
+  call <- as.character(c(2:length(ts_df)))
+  call <- glue::glue_collapse(x = call, " + ")
+  call <- paste0("1 ~ ", call)
+  call <- as.formula(call)
+  
+  #get forecast data
+  X_test <- ts_df[nrow(ts_df), c(1:(length(ts_df)-1))]
+  names(X_test) <- names(ts_df[-1])
+  #get forest
+  forest <- reg_rf(formula = call, data = ts_df)
+  
+  #get prediction
+  pred <- get_forecast(forest, X_test)
+}
 
 #Use sprout trees ------------------------------------
 #get formula call
@@ -271,11 +289,45 @@ call <- as.formula(call)
 
 tree <- sprout_tree(formula = call, feature_frac = 1, data = infl_mbd)
 real_tree <- reg_tree(call, infl_mbd, 10)
+
+#predict 1 month out ----------------------------
+pred_12 <- c()
+monthly_dates <- seq(as.Date("2017/1/1"), as.Date("2018/1/1"), "month")
+for (monthx in monthly_dates) {
+  #initialize training data according to expanding horizon
+  train_df <- values_df %>% 
+    filter(date <= monthx)
+  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
+  
+  infl_mbd <- embed(train_tsData, 12)
+  infl_mbd <- as.data.frame(infl_mbd)
+  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  
+  temp_pred <- forecast_rf(call, infl_mbd, 1)
+  pred_12 <- c(pred_12, temp_pred)
+}
+pred_12 <- ts(pred_12, start = c(2017, 2), frequency = 12)
+real_ts <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
+accuracy (pred_12, real_ts)
+
+pred_arima <- c()
+for (monthx in monthly_dates) {
+  #initialize training data according to expanding horizon
+  train_df <- values_df %>% 
+    filter(date <= monthx)
+  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
+  
+  pred_a <- forecast(auto.arima(train_tsData), 1)$mean
+  pred_arima <- c(pred_arima, pred_a)
+}
+pred_arima <- ts(pred_arima, start = c(2017, 2), frequency = 12)
+accuracy(pred_arima, real_ts)
+
+
+
 #Use forest ---------------------------------------------
 #create forest and trees
 forest <- reg_rf(formula = call, minsize = 10, data = infl_mbd)
-trees <- forest$trees[,1]
-forest_df <- do.call(rbind, trees)
 
 #get and graph fit
 forest_fit <- forest$fit$means
@@ -291,28 +343,3 @@ plot <- ggplot(data = tidy_graph, aes(x = obs, y = value, color = key)) +
   geom_line()
 
 plot
-
-# get accuracy 
-forest_ts <- ts(forest_fit, start = c(1959, 1), frequency = 12)
-real_ts <- ts(real, start = c(1959, 1), frequency = 12)
-accuracy(forest_ts, real_ts)
-#get leaves, find importance of each variable ----------------------------
-leaves_df <- forest_df %>% 
-  filter(TERMINAL == "LEAF") %>% 
-  select(-TERMINAL)
-for (i in one_ten) {
-  temp <- grepl(i, leaves_df$FILTER, fixed = TRUE)
-  leaves_df[i] <- ifelse(temp, leaves_df$NOBS, NA)
-}
-leaf_filters <- leaves_df$FILTER
-leaf_filters[(length(leaf_filters) + 1)] <- NA_character_
-leaves_df <- leaves_df %>% 
-  select(-FILTER)
-sums <- base::colSums(leaves_df, na.rm = TRUE)
-leaves_df <- rbind(leaves_df, sums = sums)
-leaves_df <- cbind(leaves_df, leaf_filters)
-
-
-
-
-
