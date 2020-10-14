@@ -174,14 +174,22 @@ sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NUL
   # calculate fitted values
   leafs <- tree$tree[tree$tree$TERMINAL == "LEAF", ]
   fitted <- c()
+  criteria <- c()
+  predictions <- c()
   for (i in seq_len(nrow(leafs))) {
+    criterion <- leafs[i, "FILTER"]
     # extract index
     ind <- as.numeric(rownames(subset(data, eval(parse(text = leafs[i, "FILTER"])))))
     # estimator is the mean y value of the leaf
     fitted[ind] <- mean(y[ind])
+    pred <- mean(y[ind])
+    criteria <- c(criteria, criterion)
+    predictions <- c(predictions, pred)
   }
   
-  tree$new_fit <- fitted
+  pred <- data.frame(criteria, predictions)
+  tree$pred <- pred
+  tree$fit <- fitted
 
   # return the tree
   return(tree)
@@ -202,7 +210,7 @@ reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE
   )
 
   # extract fit
-  fits <- do.call("cbind", trees[, 5])
+  fits <- do.call("cbind", trees[, 2])
   fits <- as.data.frame(fits)
   # calculate the final fit as a mean of all regression trees
   means <- rowMeans(fits, na.rm = TRUE)
@@ -210,6 +218,44 @@ reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE
   return(list(trees = trees, fit = fits))
   # return(forest_df)
 }
+get_forecast <- function(forest, data) {
+  predictions <- forest$trees[,5]
+  predictions_df <- do.call(rbind, predictions)
+  tf <- c()
+  for(i in 1:nrow(predictions_df)) {
+    f <- nrow(subset(data, eval(parse(text = predictions_df$criteria[i])))) > 0
+    tf <- c(tf, f)
+  }
+  predictions_df$tf <- tf
+  predictions_df <- predictions_df %>% 
+    dplyr::filter(tf)
+  
+  pred <- mean(predictions_df$predictions)
+}
+forecast_rf <- function(formula, data, horizon, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL) {
+  #get y and X trainers
+  y_train <- data[, 1]
+  X_train <- data[, -1]
+  X_test <- data[nrow(data), c(1:(length(data)-1))]
+  names(X_test) <- names(data[-1])
+  #update based on horizon
+  y_train <- y_train[-c(1:(horizon - 1))] 
+  X_train <- X_train[-c((nrow(X_train) - (horizon - 2)):nrow(X_train)), ] 
+  
+  adj_data <- data.frame(y_train, X_train)
+  names(adj_data) <- names(data)
+  
+  forest <- reg_rf(formula = formula,
+                   n_trees = n_trees,
+                   feature_frac = feature_frac,
+                   sample_data = sample_data,
+                   minsize = minsize,
+                   data = adj_data)
+  
+  pred <- get_forecast(forest, X_test)
+  
+}
+
 
 #Use sprout trees ------------------------------------
 #get formula call
