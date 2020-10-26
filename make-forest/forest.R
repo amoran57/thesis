@@ -334,7 +334,7 @@ pred_arima <- c()
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
-    filter(date <= monthx)
+    dplyr::filter(date <= monthx)
   train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
   
   pred_a <- forecast(auto.arima(train_tsData), 1)$mean
@@ -355,16 +355,29 @@ infl_df <- as.data.frame(tsData) %>%
   dplyr::select(infl = x) %>% 
   mutate(date = seq(as.Date("1959/1/1"), as.Date("2020/8/1"), "month"))
 
-compare <- infl_df %>% left_join(month_df) %>% left_join(arima_df) %>% dplyr::select(date, everything())
+compare <- infl_df %>% left_join(month_df) %>% left_join(arima_df) %>% 
+  dplyr::select(date, everything()) %>% 
+  dplyr::filter(date >= as.Date("2000/1/1") & date <= as.Date("2018/1/1"))
+
 tidy_compare <- gather(data = compare, key = "key", value = "value", "infl":"arima")
 
 compare_plot <- ggplot(data = tidy_compare, aes(x = date, y = value, color = key)) +
-  geom_line()
+  geom_line() +
+  scale_color_manual(values = c("red", "darkgreen", "black")) +
+  theme_minimal() +
+  labs(
+    title = "Forecasted monthly inflation",
+    subtitle = "Predicted one month ahead for 2000-2018 given 1959-2017 data",
+    x = "Date",
+    y = "Inflation"
+  )
 
-
-pdf("plot.pdf")
+compare_plot
+png("my_forest_plot.png")
 compare_plot
 dev.off()
+
+write_rds(compare, paste0(export, "my_forest_data.rds"))
 
 #Use forest ---------------------------------------------
 #create forest and trees
