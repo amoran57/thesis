@@ -11,11 +11,11 @@ values_df <- df %>%
 tsData <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
 
 infl_mbd <- embed(values_df$infl, 12)
-unemp_mbd <- as.data.frame(embed(values_df$unemp, 6))[-c(1:6),]
+#unemp_mbd <- as.data.frame(embed(values_df$unemp, 6))[-c(1:6),]
 infl_mbd <- as.data.frame(infl_mbd)
 names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
-names(unemp_mbd) <- c("un", "unmin1", "unmin2", "unmin3", "unmin4", "unmin5")
-infl_mbd <- cbind(infl_mbd, unemp_mbd)
+#names(unemp_mbd) <- c("un", "unmin1", "unmin2", "unmin3", "unmin4", "unmin5")
+#infl_mbd <- cbind(infl_mbd, unemp_mbd)
 rownames(infl_mbd) <- seq(1:nrow(infl_mbd))
 # Random Forest --------------------------------------------
 # Credit: https://www.statworx.com/blog/coding-regression-trees-in-150-lines-of-code
@@ -173,7 +173,7 @@ sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NUL
                      minsize = minsize)
   }
 
-  # calculate fitted values
+  # calculate fitted values, sorting criteria, and predictions for each criterion
   leafs <- tree$tree[tree$tree$TERMINAL == "LEAF", ]
   fitted <- c()
   criteria <- c()
@@ -221,32 +221,49 @@ reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE
   # return(forest_df)
 }
 get_forecast <- function(forest, data) {
+  #grab the predictions from each tree, collapse to dataframe
   predictions <- forest$trees[,5]
   predictions_df <- do.call(rbind, predictions)
+  
+  #for every leaf in the forest, determine if the data we're forecasting fits the leaf's splitting criterion
+  #there should be as many TRUE values as there are trees in the forest (one leaf per tree corresponds to our data)
   tf <- c()
   for(i in 1:nrow(predictions_df)) {
     f <- nrow(subset(data, eval(parse(text = predictions_df$criteria[i])))) > 0
     tf <- c(tf, f)
   }
+  
+  #get only the leaves (and predictions) that correspond to our data
   predictions_df$tf <- tf
   predictions_df <- predictions_df %>% 
     dplyr::filter(tf)
   
+  #prediction is the average value of our relevant leaves
   pred <- mean(predictions_df$predictions)
 }
+#function to take entire dataframe as input, make the forest and the prediction in one function
 forecast_rf <- function(formula, data, horizon, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL) {
   #get y and X trainers
+  
+  #all y values
   y_train <- data[, 1]
+  #all x values
   X_train <- data[, -1]
+  #last row of dataframe is the one we want in order to make the prediction
   X_test <- data[nrow(data), c(1:(length(data)-1))]
   names(X_test) <- names(data[-1])
+  
   #update based on horizon
+  #remove the first (horizon) values from the y vector
   y_train <- y_train[-c(1:(horizon - 1))] 
+  #remove the last (horizon) rows from the X matrix
   X_train <- X_train[-c((nrow(X_train) - (horizon - 2)):nrow(X_train)), ] 
   
+  #merge back together to create a data.frame for the given horizon
   adj_data <- data.frame(y_train, X_train)
   names(adj_data) <- names(data)
   
+  #create a forest based on that horizon-adjusted data.frame
   forest <- reg_rf(formula = formula,
                    n_trees = n_trees,
                    feature_frac = feature_frac,
@@ -254,9 +271,12 @@ forecast_rf <- function(formula, data, horizon, n_trees = 50, feature_frac = 0.7
                    minsize = minsize,
                    data = adj_data)
   
+  #get the prediction (horizon) periods ahead based on the most recent data available (last row of original data.frame)
   pred <- get_forecast(forest, X_test)
   return(pred)
 }
+#incomplete: function that is meant to take a y time-series and any number of x time-series objects as input
+#meant to allow for more than just a purely auto-regressive forest
 ts_forest <- function(y, x = NULL, y_lag_order = 12, x_lag_order = NULL, horizon = 1) {
   
   #get y data frame
@@ -297,12 +317,12 @@ ts_forest <- function(y, x = NULL, y_lag_order = 12, x_lag_order = NULL, horizon
 
 #Use sprout trees ------------------------------------
 #get formula call
-call <- as.character(seq(1:11))
+call <- as.character(seq(1:(length(infl_mbd)- 1)))
 for(i in 1:length(call)) {
   call[i] <- paste0("tmin", as.character(i))
 }
 
-call <- c(call, names(unemp_mbd))
+#call <- c(call, names(unemp_mbd))
 ind <- glue::glue_collapse(x = call, " + ")
 call <- paste0("t ~ ", ind)
 call <- as.formula(call)
@@ -319,17 +339,22 @@ for (monthx in monthly_dates) {
     dplyr::filter(date <= monthx)
   train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
   
+  #convert to data.frame
   infl_mbd <- embed(train_tsData, 12)
   infl_mbd <- as.data.frame(infl_mbd)
   names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
   
+  #get forecast
   temp_pred <- forecast_rf(call, infl_mbd, 1)
+  #append to vector
   pred_month <- c(pred_month, temp_pred)
 }
+#get accuracy data
 pred_month <- ts(pred_month, start = c(2000, 1), frequency = 12)
 real_ts <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
 accuracy (pred_month, real_ts)
 
+#compare with auto.arima() method
 pred_arima <- c()
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
@@ -337,12 +362,15 @@ for (monthx in monthly_dates) {
     filter(date <= monthx)
   train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
   
+  #get prediction
   pred_a <- forecast(auto.arima(train_tsData), 1)$mean
   pred_arima <- c(pred_arima, pred_a)
 }
+#get accuracy
 pred_arima <- ts(pred_arima, start = c(2000, 1), frequency = 12)
 accuracy(pred_arima, real_ts)
 
+#convert forest predictions, ARIMA predictions, and acutal inflation to data.frame
 month_df <- as.data.frame(pred_month) %>% 
   dplyr::select(forest = x) %>% 
   dplyr::mutate(date = seq(as.Date("2000/1/1"), as.Date("2018/1/1"), "month"))
@@ -356,12 +384,15 @@ infl_df <- as.data.frame(tsData) %>%
   mutate(date = seq(as.Date("1959/1/1"), as.Date("2020/8/1"), "month"))
 
 compare <- infl_df %>% left_join(month_df) %>% left_join(arima_df) %>% dplyr::select(date, everything())
+
+#tidy the data.frame in order to graph it
 tidy_compare <- gather(data = compare, key = "key", value = "value", "infl":"arima")
 
+#make graph
 compare_plot <- ggplot(data = tidy_compare, aes(x = date, y = value, color = key)) +
   geom_line()
 
-
+#save graph
 pdf("plot.pdf")
 compare_plot
 dev.off()
