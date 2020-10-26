@@ -8,6 +8,8 @@ df <- read_rds(paste0(export, "master_data.rds"))
 values_df <- df %>% 
   dplyr::filter(year >= 1959)
 
+tsData <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
+
 infl_mbd <- embed(values_df$infl, 12)
 unemp_mbd <- as.data.frame(embed(values_df$unemp, 6))[-c(1:6),]
 infl_mbd <- as.data.frame(infl_mbd)
@@ -255,10 +257,28 @@ forecast_rf <- function(formula, data, horizon, n_trees = 50, feature_frac = 0.7
   pred <- get_forecast(forest, X_test)
   return(pred)
 }
-ts_forest <- function(lag_order, data) {
-  #get data frame
-  ts_df <- as.data.frame(embed(data, lag_order))
-  names(ts_df) <- as.character(seq(1:length(ts_df)))
+ts_forest <- function(y, x = NULL, y_lag_order = 12, x_lag_order = NULL, horizon = 1) {
+  
+  #get y data frame
+  y_df <- as.data.frame(embed(y, y_lag_order))
+  y_names <- as.character(seq(1:(length(y_df) - 1)))
+  y_names <- paste0("tmin", y_names)
+  y_names <- c("t", y_names)
+  names(y_df) <- y_names
+  
+  #get x data frame
+  X <- data.frame()
+  num_x <- 0
+  for(this_x in x) {
+    x_df <- as.data.frame(embed(this_x, x_lag_order))
+    x_names <- as.character(seq(1:(length(x_df))))
+    x_prefix <- paste0("x", as.character(num_x), "min")
+    x_names <- paste0(x_prefix, x_names)
+    names(x_df) <- x_names
+    X <- cbind(X, x_df)
+    num_x <- num_x + 1
+  }
+  
   #get formula
   call <- as.character(c(2:length(ts_df)))
   call <- glue::glue_collapse(x = call, " + ")
@@ -291,8 +311,8 @@ tree <- sprout_tree(formula = call, feature_frac = 1, data = infl_mbd)
 real_tree <- reg_tree(call, infl_mbd, 10)
 
 #predict 1 month out ----------------------------
-pred_12 <- c()
-monthly_dates <- seq(as.Date("2017/1/1"), as.Date("2018/1/1"), "month")
+pred_month <- c()
+monthly_dates <- seq(as.Date("1999/12/1"), as.Date("2017/12/1"), "month")
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
@@ -304,9 +324,9 @@ for (monthx in monthly_dates) {
   names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
   
   temp_pred <- forecast_rf(call, infl_mbd, 1)
-  pred_12 <- c(pred_12, temp_pred)
+  pred_month <- c(pred_12, temp_pred)
 }
-pred_12 <- ts(pred_12, start = c(2017, 2), frequency = 12)
+pred_month <- ts(pred_12, start = c(2000, 1), frequency = 12)
 real_ts <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
 accuracy (pred_12, real_ts)
 
@@ -320,10 +340,31 @@ for (monthx in monthly_dates) {
   pred_a <- forecast(auto.arima(train_tsData), 1)$mean
   pred_arima <- c(pred_arima, pred_a)
 }
-pred_arima <- ts(pred_arima, start = c(2017, 2), frequency = 12)
+pred_arima <- ts(pred_arima, start = c(2000, 1), frequency = 12)
 accuracy(pred_arima, real_ts)
 
+month_df <- as.data.frame(pred_month) %>% 
+  dplyr::select(forest = x) %>% 
+  dplyr::mutate(date = seq(as.Date("2000/1/1"), as.Date("2018/1/1"), "month"))
 
+arima_df <- as.data.frame(pred_arima) %>% 
+  dplyr::select(arima = x) %>% 
+  dplyr::mutate(date = seq(as.Date("2000/1/1"), as.Date("2018/1/1"), "month"))
+
+infl_df <- as.data.frame(tsData) %>% 
+  dplyr::select(infl = x) %>% 
+  mutate(date = seq(as.Date("1959/1/1"), as.Date("2020/8/1"), "month"))
+
+compare <- infl_df %>% left_join(month_df) %>% left_join(arima_df) %>% dplyr::select(date, everything())
+tidy_compare <- gather(data = compare, key = "key", value = "value", "infl":"arima")
+
+compare_plot <- ggplot(data = tidy_compare, aes(x = date, y = value, color = key)) +
+  geom_line()
+
+
+pdf("plot.pdf")
+compare_plot
+dev.off()
 
 #Use forest ---------------------------------------------
 #create forest and trees
