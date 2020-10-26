@@ -316,7 +316,7 @@ monthly_dates <- seq(as.Date("1999/12/1"), as.Date("2017/12/1"), "month")
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
-    filter(date <= monthx)
+    dplyr::filter(date <= monthx)
   train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
   
   infl_mbd <- embed(train_tsData, 12)
@@ -324,11 +324,11 @@ for (monthx in monthly_dates) {
   names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
   
   temp_pred <- forecast_rf(call, infl_mbd, 1)
-  pred_month <- c(pred_12, temp_pred)
+  pred_month <- c(pred_month, temp_pred)
 }
-pred_month <- ts(pred_12, start = c(2000, 1), frequency = 12)
+pred_month <- ts(pred_month, start = c(2000, 1), frequency = 12)
 real_ts <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
-accuracy (pred_12, real_ts)
+accuracy (pred_month, real_ts)
 
 pred_arima <- c()
 for (monthx in monthly_dates) {
