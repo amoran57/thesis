@@ -25,7 +25,7 @@ sse_var <- function(x, y) {
   split_at <- splits[which.min(sse)]
   return(c(sse = min(sse), split = split_at))
 }
-reg_tree <- function(formula, data, minsize, penalty) {
+reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
   
   # coerce to data.frame
   data <- as.data.frame(data)
@@ -111,7 +111,7 @@ reg_tree <- function(formula, data, minsize, penalty) {
               if (any(tmp_nobs <= minsize)) {
                 split_here <- rep(FALSE, 2)
               }
-            } else {
+            } else if (!is.null(penalty)) {
         
               #calculate improvement in SSE
               first_branch <- subset(this_data, eval(parse(text = tmp_filter[1])))[, as.character(formula)[2]]
@@ -158,7 +158,11 @@ reg_tree <- function(formula, data, minsize, penalty) {
   for (i in seq_len(nrow(leafs))) {
     criterion <- leafs[i, "FILTER"]
     # extract index
-    ind <- as.numeric(rownames(subset(data, eval(parse(text = leafs[i, "FILTER"])))))
+    if(!is.na(criterion)) {
+      ind <- as.numeric(rownames(subset(data, eval(parse(text = criterion)))))
+    } else {
+      ind <- as.numeric(rownames(data))
+    }
     # estimator is the mean y value of the leaf
     fitted[ind] <- mean(y[ind])
     pred <- mean(y[ind])
@@ -169,10 +173,97 @@ reg_tree <- function(formula, data, minsize, penalty) {
   pred <- data.frame(criteria, predictions)
   
   # return everything
-  return(list(tree = tree_info, fit = fitted, formula = formula, data = data, pred = pred))
+  return(list(tree = tree_info, fit = fitted, formula = formula, data = data, pred = pred, penalty = penalty))
 }
-
-#use tree -------------------------
+sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+  # extract features
+  features <- all.vars(formula)[-1]
+  # extract target
+  target <- all.vars(formula)[1]
+  #add data trend
+  data$trend <- seq(1:nrow(data))
+  # bag the data
+  # - randomly sample the data with replacement (duplicate are possible)
+  if (sample_data == TRUE) {
+    train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
+  } else {
+    train <- data
+  }
+  train <- dplyr::arrange(train, trend)
+  rownames(train) <- seq(1:nrow(train))
+  # randomly sample features
+  # - only fit the regression tree with feature_frac * 100 % of the features
+  features_sample <- sample(features,
+                            size = ceiling(length(features) * feature_frac),
+                            replace = FALSE)
+  # create new formula
+  formula_new <-
+    as.formula(paste0(target, " ~ ", paste0(features_sample,
+                                            collapse =  " + ")))
+  # fit the regression tree
+  if(!is.null(penalties)) {
+    # "cross-validate" by testing the tree for each penalty over the most recent four years
+    rmses <- c()
+    for(penalty in penalties) {
+      #get test and training data.frames
+      train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
+      test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
+      rownames(test_df) <- seq(1:nrow(test_df))
+      
+      #get a tree built on the training data and the current penalty
+      temp_tree <- reg_tree(formula_new, train_df, penalty = 0.8)
+      temp_tree_pred <- temp_tree$pred
+      
+      #predict each value in test_df
+      if(nrow(temp_tree_pred) > 1) {
+       tree_predictions <- c()
+       for(j in 1:nrow(test_df)) {
+         tf <- c()
+         for(i in 1:nrow(temp_tree_pred)) {
+           f <- eval(parse(text = temp_tree_pred$criteria[i]), envir = test_df[j,])
+            tf <- c(tf, f)
+         }
+         temp_tree_pred$tf <- tf
+         temp_pred <- temp_tree_pred %>% 
+           dplyr::filter(tf)
+      
+          #append to vector
+         tree_predictions <- c(tree_predictions, temp_pred$predictions)
+       }
+      } else {
+        tree_predictions <- rep(temp_tree_pred[1, "predictions"], nrow(test_df))
+      }
+      
+      #get the RMSE for that penalty
+      ind_var <- as.character(target)
+      temp_df <- data.frame(tree_predictions, test_df[ind_var])
+      names(temp_df) <- c("prediction", "real")
+      temp_rmse <- ModelMetrics::rmse(temp_df$real, temp_df$prediction)
+      rmses <- c(rmses, temp_rmse)
+    }
+    
+    penalty_df <- t(data.frame(rmses, penalties))
+    best_penalty <- which.min(penalty_df[1,])
+    penalty <- penalty_df[2, best_penalty]
+    
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     penalty = penalty)
+    
+  } else if (is.null(minsize)) {
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     minsize = ceiling(nrow(train) * 0.1))
+  } else {
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     minsize = minsize)
+  }
+  
+  # return the tree
+  return(tree)
+}
+#use tree -----------------------------------
 #get formula call
 call <- as.character(seq(1:(length(infl_mbd)- 1)))
 for(i in 1:length(call)) {
@@ -196,7 +287,8 @@ for (monthx in monthly_dates) {
   #convert to data.frame
   infl_mbd <- embed(train_tsData, 12)
   infl_mbd <- as.data.frame(infl_mbd)
-  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  infl_mbd$trend <- seq(1:nrow(infl_mbd))
+  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11", "trend")
   test_df <- infl_mbd[nrow(infl_mbd), -1]
   infl_mbd <- infl_mbd[-nrow(infl_mbd),]
   rownames(infl_mbd) <- seq(1:nrow(infl_mbd))
@@ -232,7 +324,8 @@ for (monthx in monthly_dates) {
   #convert to data.frame
   infl_mbd <- embed(train_tsData, 12)
   infl_mbd <- as.data.frame(infl_mbd)
-  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  infl_mbd$trend <- seq(1:nrow(infl_mbd))
+  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11", "trend")
   test_df <- infl_mbd[nrow(infl_mbd), -1]
   infl_mbd <- infl_mbd[-nrow(infl_mbd),]
   rownames(infl_mbd) <- seq(1:nrow(infl_mbd))
