@@ -87,20 +87,27 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
       split_here  <- !sapply(tmp_filter,
                              FUN = function(x,y) any(grepl(x, x = y)),
                              y = tree_info$FILTER)
+
       
-      # append the splitting rules
       if (!is.na(tree_info[j, "FILTER"])) {
+        # append the splitting rules
         tmp_filter  <- paste(tree_info[j, "FILTER"], 
                              tmp_filter, sep = " & ")
-      } 
+      }
       
-      # get the number of observations in current node
-      tmp_nobs <- sapply(tmp_filter,
-                         FUN = function(i, x) {
-                           nrow(subset(x = x, subset = eval(parse(text = i))))
-                         },
-                         x = this_data)  
+      #to catch repeated observations when this is run in the context of sprout_tree
+      if(this_sse == 0) {
+        split_here <- rep(FALSE, 2)
+      } else {
+        # get the number of observations in current node
+        tmp_nobs <- sapply(tmp_filter,
+                           FUN = function(i, x) {
+                             nrow(subset(x = x, subset = eval(parse(text = i))))
+                           },
+                           x = this_data)  
+      }
       
+      #check for valid split based on minsize or penalty
       if (all(split_here)) {
         if (any(tmp_nobs == 0)) {
             split_here <- rep(FALSE, 2)
@@ -182,6 +189,7 @@ sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NUL
   target <- all.vars(formula)[1]
   #add data trend
   data$trend <- seq(1:nrow(data))
+  features <- c(features, "trend")
   # bag the data
   # - randomly sample the data with replacement (duplicate are possible)
   if (sample_data == TRUE) {
@@ -211,7 +219,7 @@ sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NUL
       rownames(test_df) <- seq(1:nrow(test_df))
       
       #get a tree built on the training data and the current penalty
-      temp_tree <- reg_tree(formula_new, train_df, penalty = 0.8)
+      temp_tree <- reg_tree(formula_new, train_df, minsize = NULL, penalty = penalty)
       temp_tree_pred <- temp_tree$pred
       
       #predict each value in test_df
