@@ -13,16 +13,40 @@ tsData <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
 infl_mbd <- embed(values_df$infl, 12)
 infl_mbd <- as.data.frame(infl_mbd)
 names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+infl_mbd$trend <- seq(1:nrow(infl_mbd))
 rownames(infl_mbd) <- seq(1:nrow(infl_mbd))
 
 sse_var <- function(x, y) {
-  splits <- sort(unique(x))
+  this_df <- data.frame(x,y) %>% 
+    dplyr::arrange(x)
+  
+  y <- this_df$y
+  y_length <- length(y)
+  
   sse <- c()
-  for (i in seq_along(splits)) {
-    sp <- splits[i]
-    sse[i] <- sum((y[x < sp] - mean(y[x < sp]))^2) + sum((y[x >= sp] - mean(y[x >= sp]))^2) 
+  
+  #initialize values
+  first_node <- c()
+  first_mean <- 0
+  first_sse <- 0
+  second_node <- y
+  second_mean <- mean(second_node)
+  second_sse <- sum((second_node - second_mean)^2)
+  
+  for (i in 1:length(y)) {
+    y_new <- y[i]
+    
+    #update values
+    first_node <- c(first_node, y_new)
+    first_mean <- (first_mean*(i - 1) + y_new)/i
+    first_sse <- sum((first_node - first_mean)^2)
+    second_node <- second_node[-1]
+    second_mean <- (second_mean*(y_length - i + 1) - y_new)/(y_length - i)
+    second_sse <- sum((second_node - second_mean)^2)
+    sse[i] <- first_sse + second_sse
   }
-  split_at <- splits[which.min(sse)]
+  
+  split_at <- this_df[which.min(sse) + 1,]$x
   return(c(sse = min(sse), split = split_at))
 }
 reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
@@ -271,6 +295,24 @@ sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NUL
   # return the tree
   return(tree)
 }
+reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+  # apply the rf_tree function n_trees times with plyr::raply
+  # - track the progress with a progress bar
+  trees <- plyr::raply(
+    n_trees,
+    sprout_tree(
+      formula = formula,
+      feature_frac = feature_frac,
+      sample_data = sample_data,
+      minsize = minsize,
+      data = data,
+      penalties = penalties
+    ),
+    .progress = "text"
+  )
+  
+  return(trees)
+}
 #use tree -----------------------------------
 #get formula call
 call <- as.character(seq(1:(length(infl_mbd)- 1)))
@@ -281,6 +323,45 @@ for(i in 1:length(call)) {
 ind <- glue::glue_collapse(x = call, " + ")
 call <- paste0("t ~ ", ind)
 call <- as.formula(call)
+
+penalties <- seq(0.75, 0.99, by = 0.01)
+
+tic("forest")
+forest <- reg_rf(formula = call,
+                 data = infl_mbd,
+                 penalties = penalties)
+toc()
+
+pred_rf <- function(forest, data) {
+  predictions <- forest[,5]
+  predictions_df <- do.call(rbind, predictions)
+  
+  #initialize prediction vector and other vector
+  preds <- c()
+  tf <- c()
+  #for each row in the data, get the fitted value from the forest
+  for(j in 1:nrow(data)) {
+    #grab the individual row from the data
+    this_data <- data[j,]
+
+    #identify each relevant row in the forest
+    for(i in 1:nrow(predictions_df)) {
+      tf[i] <- nrow(subset(this_data, eval(parse(text = predictions_df$criteria[i])))) > 0
+    }
+    
+    #grab the relevant fitted values
+    this_prediction_vector <- predictions_df[tf,"predictions"]
+    
+    #append the mean of those values to the vector
+    preds[j] <- mean(this_prediction_vector)
+  }
+  return(predictions = preds)
+}
+
+preds <- pred_rf(forest = forest, data = infl_mbd)
+
+fits <- data.frame(real = infl_mbd$t, pred = preds)
+rmse <- ModelMetrics::rmse(fits$real, fits$pred)
 
 #predict one month out
 pred_month <- c()
@@ -356,6 +437,8 @@ for (monthx in monthly_dates) {
 pred_min <- ts(pred_min, start = c(2000,1), frequency = 12)
 accuracy(pred_min, real_ts)
 
+
+#plot results -------------------------------
 infl <- values_df %>% 
   dplyr::filter(date >= as.Date("2000/1/1") & date <= as.Date("2018/1/1"))
 
