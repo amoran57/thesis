@@ -13,7 +13,7 @@ tsData <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
 infl_mbd <- embed(values_df$infl, 12)
 infl_mbd <- as.data.frame(infl_mbd)
 names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
-infl_mbd$trend <- seq(1:nrow(infl_mbd))
+#infl_mbd$trend <- seq(1:nrow(infl_mbd))
 rownames(infl_mbd) <- seq(1:nrow(infl_mbd))
 
 sse_var <- function(x, y) {
@@ -58,7 +58,7 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
   formula <- terms.formula(formula)
   
   # get the design matrix
-  X <- model.matrix(formula, data)
+  X <- model.matrix(formula, data)[,-1]
   
   # extract target
   y <- data[, as.character(formula)[2]]
@@ -77,23 +77,30 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
     to_calculate <- which(tree_info$TERMINAL == "SPLIT")
     
     for (j in to_calculate) {
+   
+      #initiate kill condition
+      keep_going <- TRUE
       
+      while(keep_going) {   
       # handle root node
       if (!is.na(tree_info[j, "FILTER"])) {
         # subset data according to the filter
         this_data <- subset(data, eval(parse(text = tree_info[j, "FILTER"])))
         # get the design matrix
-        X <- model.matrix(formula, this_data)
+        X <- model.matrix(formula, this_data)[,-1]
       } else {
         this_data <- data
       }
       
       #calculate current SSE
       this_y <- this_data[, as.character(formula)[2]]
-      this_sse <- sum((this_y[1:length(this_y)] - mean(this_y))^2)
+      mean_this_y <- mean(this_y)
+      this_sse <- sum((this_y - mean_this_y)^2)
+      #update kill condition
+      keep_going <- ifelse(this_sse == 0, FALSE, TRUE)
       
       # estimate splitting criteria
-      splitting <- apply(X,  MARGIN = 2, FUN = sse_var, y = this_data[, all.vars(formula)[1]])
+      splitting <- apply(X,  MARGIN = 2, FUN = sse_var, y = this_y)
       
       # get the min SSE
       tmp_splitter <- which.min(splitting[1,])
@@ -111,7 +118,8 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
       split_here  <- !sapply(tmp_filter,
                              FUN = function(x,y) any(grepl(x, x = y)),
                              y = tree_info$FILTER)
-
+      #update kill condition
+      keep_going <- ifelse(all(split_here), TRUE, FALSE)
       
       if (!is.na(tree_info[j, "FILTER"])) {
         # append the splitting rules
@@ -119,46 +127,53 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
                              tmp_filter, sep = " & ")
       }
       
-      #to catch repeated observations when this is run in the context of sprout_tree
-      if(this_sse == 0) {
-        split_here <- rep(FALSE, 2)
-      } else {
-        # get the number of observations in current node
-        tmp_nobs <- sapply(tmp_filter,
-                           FUN = function(i, x) {
-                             nrow(subset(x = x, subset = eval(parse(text = i))))
-                           },
-                           x = this_data)  
-      }
+      # get the number of observations in current node
+      tmp_nobs <- sapply(tmp_filter,
+                         FUN = function(i, x) {
+                           subset(x = x, subset = eval(parse(text = i)))
+                         },
+                         x = this_data)
+      
+      first_node <- do.call(cbind, tmp_nobs[,1])
+      second_node <- do.call(cbind, tmp_nobs[,2])
+      tmp_nobs <- c(nrow(first_node), nrow(second_node))
+      
       
       #check for valid split based on minsize or penalty
-      if (all(split_here)) {
-        if (any(tmp_nobs == 0)) {
-            split_here <- rep(FALSE, 2)
-        } else {
-      # evaluate quality of split based on minsize or penalty
-            if (!is.null(minsize)) {
-            # insufficient minsize for split
-              if (any(tmp_nobs <= minsize)) {
-                split_here <- rep(FALSE, 2)
-              }
-            } else if (!is.null(penalty)) {
+      if (any(tmp_nobs < 2)) {
+        split_here <- rep(FALSE, 2)
+        #update kill condition
+        keep_going <- FALSE
+        #check for insufficient node sizes based on minsize
+      } else if (!is.null(minsize) & any(tmp_nobs <= minsize)) {
+        # insufficient minsize for split
+        split_here <- rep(FALSE, 2)
+        #update kill condition
+        keep_going <- FALSE
         
-              #calculate improvement in SSE
-              first_branch <- subset(this_data, eval(parse(text = tmp_filter[1])))[, as.character(formula)[2]]
-              second_branch <- subset(this_data, eval(parse(text = tmp_filter[2])))[, as.character(formula)[2]]
+      } else if (!is.null(penalty)) {
         
-              first_sse <- sum((first_branch[1:length(first_branch)] - mean(first_branch))^2)
-              second_sse <- sum((second_branch[1:length(second_branch)] - mean(second_branch))^2)
-              new_sse <- sum(first_sse, second_sse)
+        #calculate improvement in SSE
+        first_branch <- first_node[, as.character(formula)[2]]
+        first_branch_mean <- mean(first_branch)
+        second_branch <- second_node[, as.character(formula)[2]]
+        second_branch_mean <- mean(second_branch)
         
-              improvement <- new_sse/this_sse
-              #if the change in SSE is less than demanded, don't split
-              if(improvement > penalty) {
-                split_here <- rep(FALSE, 2)
-              }
-            }
+        first_sse <- sum((first_branch - first_branch_mean)^2)
+        second_sse <- sum((second_branch - second_branch_mean)^2)
+        new_sse <- sum(first_sse, second_sse)
+        
+        improvement <- new_sse/this_sse
+        
+        #if the change in SSE is less than demanded, don't split
+        if(improvement > penalty) {
+          split_here <- rep(FALSE, 2)
+          #update kill condition
+          keep_going <- FALSE
+        }
       }
+      #end while loop
+      keep_going <- FALSE
     }
       
       
@@ -194,11 +209,12 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
     } else {
       ind <- as.numeric(rownames(data))
     }
+    
     # estimator is the mean y value of the leaf
-    fitted[ind] <- mean(y[ind])
-    pred <- mean(y[ind])
-    criteria <- c(criteria, criterion)
-    predictions <- c(predictions, pred)
+    mean_ind <- mean(y[ind])
+    fitted[ind] <- mean_ind
+    predictions[i] <- mean_ind
+    criteria[i] <- criterion
   }
   
   pred <- data.frame(criteria, predictions)
