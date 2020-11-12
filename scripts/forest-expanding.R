@@ -58,8 +58,8 @@ for (monthx in monthly_dates) {
   
   # here is where we reshape the training data to reflect the time distance
   # corresponding to the current forecast horizon.
-  y_train <- y_train[-c(1:(horizon - 1))] 
-  X_train <- X_train[-c((nrow(X_train) - (horizon - 2)):nrow(X_train)), ] 
+  y_train <- y_train[-c(1:(horizon - 1))]
+  X_train <- X_train[-c((nrow(X_train) - (horizon - 2)):nrow(X_train)), ]
 
     set.seed(1960)
     # fit the model
