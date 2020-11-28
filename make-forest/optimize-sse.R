@@ -255,6 +255,7 @@ sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NUL
       #get a tree built on the training data and the current penalty
       temp_tree <- reg_tree(formula_new, train_df, minsize = NULL, penalty = penalty)
       temp_tree_pred <- temp_tree$pred
+      temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
       
       #predict each value in test_df
       if(nrow(temp_tree_pred) > 1) {
@@ -284,19 +285,23 @@ sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NUL
       rmses <- c(rmses, temp_rmse)
     }
     
+    #find the penalty which minimizes RMSE
     penalty_df <- t(data.frame(rmses, penalties))
     best_penalty <- which.min(penalty_df[1,])
     penalty <- penalty_df[2, best_penalty]
     
+    #build a tree on the full subsample using that penalty
     tree <- reg_tree(formula = formula_new,
                      data = train,
                      penalty = penalty)
     
   } else if (is.null(minsize)) {
+    #if penalties and minsize are both null, use a rough minsize
     tree <- reg_tree(formula = formula_new,
                      data = train,
                      minsize = ceiling(nrow(train) * 0.1))
   } else {
+    #if penalties is null but minsize exists, use minsize
     tree <- reg_tree(formula = formula_new,
                      data = train,
                      minsize = minsize)
@@ -344,6 +349,7 @@ new_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize =
       #get a tree built on the training data and the current penalty
       temp_tree <- reg_tree(formula_new, train_df, minsize = NULL, penalty = penalty)
       temp_tree_pred <- temp_tree$pred
+      temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
       
       #predict each value in test_df
       tree_predictions <- c()
@@ -430,6 +436,7 @@ fast <- plyr::raply(
 )
 toc()
 
+#isolate problematic subsamples
 for(i in 1:1000) {
   formula <- call
   data <- infl_mbd
