@@ -255,6 +255,7 @@ sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NUL
       #get a tree built on the training data and the current penalty
       temp_tree <- reg_tree(formula_new, train_df, minsize = NULL, penalty = penalty)
       temp_tree_pred <- temp_tree$pred
+      temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
       
       #predict each value in test_df
       if(nrow(temp_tree_pred) > 1) {
@@ -344,6 +345,7 @@ new_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize =
       #get a tree built on the training data and the current penalty
       temp_tree <- reg_tree(formula_new, train_df, minsize = NULL, penalty = penalty)
       temp_tree_pred <- temp_tree$pred
+      temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
       
       #predict each value in test_df
       tree_predictions <- c()
