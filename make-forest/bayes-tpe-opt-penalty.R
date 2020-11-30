@@ -468,6 +468,44 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
     # g_plot
     
     #now we draw many candidates from l_distribution
+    #first we create a mapping data.frame to map from a uniform distribution to our custom one
+    normalize_by <- 100/sum(l_distribution$mean)
+    l_distribution$mean <- l_distribution$mean*normalize_by
+    l_distribution$cumsum <- cumsum(l_distribution$mean)
+    l_distribution$rule <- paste0("randNum <= ", as.character(l_distribution$cumsum))
+    l_distribution$other_rule <- c("randNum > 0", paste0("randNum > ", as.character(l_distribution$cumsum[-nrow(l_distribution)])))
+    l_distribution$rule <- paste0(l_distribution$rule, " & ", l_distribution$other_rule)
+    l_map <- data.frame(penalties = l_distribution$penalties, rule = as.character(l_distribution$rule))
+    
+    #now we generate 10 random numbers from a uniform distribution
+    rand_unis <- runif(10, min = 0, max = 100)
+    new_penalties <- c()
+    for(randNum in rand_unis) {
+      tf <- c()
+      for(i in 1:nrow(l_map)) {
+        f <- eval(parse(text = l_map$rule[i]))
+        tf <- c(tf, f)
+      }
+      #get the penalty from our custom distribution
+      new_penalty <- l_map$penalties[tf]
+      new_penalties <- c(new_penalties, new_penalty)
+    }
+    new_penalties <- sort(new_penalties)
+    
+    #we have our penalties, selected from l_distribution. Now we evaluate them by l_distribution/g_distribution
+    ind <- any(new_penalties) == l_distribution$penalties
+    evaluate <- data.frame(penalties = new_penalties)
+    evaluate <- left_join(evaluate, l_distribution, by = "penalties")
+    evaluate <- data.frame(penalties = new_penalties, l_mean = evaluate$mean)
+    evaluate <- left_join(evaluate, g_distribution, by = "penalties")
+    evaluate <- data.frame(penalties = new_penalties, l_mean = evaluate$l_mean, g_mean = evaluate$mean)
+    evaluate$score <- evaluate$l_mean/evaluate$g_mean
+    
+    #get the best 2 scores and fit trees for them
+    best_penalty <- evaluate$penalties[which.max(evaluate$score)]
+    second_best_penalty_score <- Rfast::nth(evaluate$score, 2, descending = T)
+    second_best_penalty <- evaluate$penalties[evaluate$score == second_best_penalty_score]
+    next_penalties <- c(best_penalty, second_best_penalty)
     
     
     
