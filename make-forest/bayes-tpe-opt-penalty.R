@@ -145,7 +145,7 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
         
         # define maxnode
         mn <- max(tree_info$NODE)
-        
+
         #update kill condition
         if(keep_going) {
           keep_going <- ifelse(all(split_here), TRUE, FALSE)
@@ -217,96 +217,6 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
   # return everything
   return(list(tree = tree_info, fit = fitted, formula = formula, data = data, pred = pred, penalty = penalty))
 }
-sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
-  # extract features
-  features <- all.vars(formula)[-1]
-  # extract target
-  target <- all.vars(formula)[1]
-  #add data trend
-  data$trend <- seq(1:nrow(data))
-  features <- c(features, "trend")
-  # bag the data
-  # - randomly sample the data with replacement (duplicate are possible)
-  if (sample_data == TRUE) {
-    train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
-  } else {
-    train <- data
-  }
-  train <- dplyr::arrange(train, trend)
-  rownames(train) <- seq(1:nrow(train))
-  # randomly sample features
-  # - only fit the regression tree with feature_frac * 100 % of the features
-  features_sample <- sample(features,
-                            size = ceiling(length(features) * feature_frac),
-                            replace = FALSE)
-  # create new formula
-  formula_new <-
-    as.formula(paste0(target, " ~ ", paste0(features_sample,
-                                            collapse =  " + ")))
-  # fit the regression tree
-  if(!is.null(penalties)) {
-    # "cross-validate" by testing the tree for each penalty over the most recent four years
-    rmses <- c()
-    for(penalty in penalties) {
-      #get test and training data.frames
-      train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
-      test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
-      rownames(test_df) <- seq(1:nrow(test_df))
-      
-      #get a tree built on the training data and the current penalty
-      temp_tree <- reg_tree(formula_new, train_df, minsize = NULL, penalty = penalty)
-      temp_tree_pred <- temp_tree$pred
-      temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
-      
-      #predict each value in test_df
-      if(nrow(temp_tree_pred) > 1) {
-        tree_predictions <- c()
-        for(j in 1:nrow(test_df)) {
-          tf <- c()
-          for(i in 1:nrow(temp_tree_pred)) {
-            f <- eval(parse(text = temp_tree_pred$criteria[i]), envir = test_df[j,])
-            tf <- c(tf, f)
-          }
-          temp_tree_pred$tf <- tf
-          temp_pred <- temp_tree_pred %>% 
-            dplyr::filter(tf)
-          
-          #append to vector
-          tree_predictions <- c(tree_predictions, temp_pred$predictions)
-        }
-      } else {
-        tree_predictions <- rep(temp_tree_pred[1, "predictions"], nrow(test_df))
-      }
-      
-      #get the RMSE for that penalty
-      ind_var <- as.character(target)
-      temp_df <- data.frame(tree_predictions, test_df[ind_var])
-      names(temp_df) <- c("prediction", "real")
-      temp_rmse <- ModelMetrics::rmse(temp_df$real, temp_df$prediction)
-      rmses <- c(rmses, temp_rmse)
-    }
-    
-    penalty_df <- t(data.frame(rmses, penalties))
-    best_penalty <- which.min(penalty_df[1,])
-    penalty <- penalty_df[2, best_penalty]
-    
-    tree <- reg_tree(formula = formula_new,
-                     data = train,
-                     penalty = penalty)
-    
-  } else if (is.null(minsize)) {
-    tree <- reg_tree(formula = formula_new,
-                     data = train,
-                     minsize = ceiling(nrow(train) * 0.1))
-  } else {
-    tree <- reg_tree(formula = formula_new,
-                     data = train,
-                     minsize = minsize)
-  }
-  
-  # return the tree
-  return(tree)
-}
 new_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # extract features
   features <- all.vars(formula)[-1]
@@ -336,13 +246,14 @@ new_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize =
   # fit the regression tree
   if(!is.null(penalties)) {
     # "cross-validate" by testing the tree for each penalty over the most recent four years
+    
+    #get test and training data.frames
+    train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
+    test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
+    rownames(test_df) <- seq(1:nrow(test_df))
+    
     rmses <- c()
     for(penalty in penalties) {
-      #get test and training data.frames
-      train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
-      test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
-      rownames(test_df) <- seq(1:nrow(test_df))
-      
       #get a tree built on the training data and the current penalty
       temp_tree <- reg_tree(formula_new, train_df, minsize = NULL, penalty = penalty)
       temp_tree_pred <- temp_tree$pred
@@ -352,22 +263,24 @@ new_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize =
       tree_predictions <- c()
       
       while(length(tree_predictions) < 48 | any(is.na(tree_predictions))) {
-      if(nrow(temp_tree_pred) > 1) {
-        for (i in seq_len(nrow(temp_tree_pred))) {
-          criterion <- temp_tree_pred[i, "criteria"]
-          # extract indices
-          if(!is.na(criterion)) {
-            ind <- as.numeric(rownames(subset(test_df, eval(parse(text = criterion)))))
-          } else {
-            ind <- as.numeric(rownames(data))
+        
+        if(nrow(temp_tree_pred) > 1) {
+          #for every prediction in temp_tree_pred
+          for (i in seq_len(nrow(temp_tree_pred))) {
+            criterion <- temp_tree_pred[i, "criteria"]
+            # extract indices
+            if(!is.na(criterion)) {
+              ind <- as.numeric(rownames(subset(test_df, eval(parse(text = criterion)))))
+            } else {
+              ind <- as.numeric(rownames(data))
+            }
+            #update tree predictions
+            tree_predictions[ind] <- temp_tree_pred[i, "predictions"]
           }
-          #update tree predictions
-          tree_predictions[ind] <- temp_tree_pred[i, "predictions"]
+        } else {
+          tree_predictions <- rep(temp_tree_pred[1, "predictions"], nrow(test_df))
         }
-      } else {
-        tree_predictions <- rep(temp_tree_pred[1, "predictions"], nrow(test_df))
       }
-    }
       
       #get the RMSE for that penalty
       ind_var <- as.character(target)
@@ -380,6 +293,11 @@ new_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize =
     penalty_df <- t(data.frame(rmses, penalties))
     best_penalty <- which.min(penalty_df[1,])
     penalty <- penalty_df[2, best_penalty]
+    
+    graph_df <- data.frame(rmses, penalties)
+    plot <- ggplot(data = graph_df, aes(x = penalties, y = rmses)) +
+      geom_line() +
+      ylim(min(rmses)/1.2, max(rmses)*1.2)
     
     tree <- reg_tree(formula = formula_new,
                      data = train,
@@ -396,56 +314,23 @@ new_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize =
   }
   
   # return the tree
-  return(tree)
+  return(list(tree = tree, penalty_plot = plot))
 }
-reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
-  # apply the rf_tree function n_trees times with plyr::raply
-  # - track the progress with a progress bar
-  trees <- plyr::raply(
-    n_trees,
-    new_sprout_tree(
-      formula = formula,
-      feature_frac = feature_frac,
-      sample_data = sample_data,
-      minsize = minsize,
-      data = data,
-      penalties = penalties
-    ),
-    .progress = "text"
-  )
-  
-  return(trees)
-}
-
-tic("slow")
-slow <- plyr::raply(
-  25,
-  sprout_tree(call, 0.7, data = infl_mbd, penalties = penalties),
-  .progress = "text"
-)
-toc()
-
-tic("fast")
-fast <- plyr::raply(
-  50,
-  new_sprout_tree(call, 0.7, data = infl_mbd, penalties = penalties),
-  .progress = "text"
-)
-toc()
-
-for(i in 1:1000) {
-  formula <- call
-  data <- infl_mbd
-  feature_frac <- 0.7
+bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+  # extract features
   features <- all.vars(formula)[-1]
   # extract target
   target <- all.vars(formula)[1]
   #add data trend
   data$trend <- seq(1:nrow(data))
   features <- c(features, "trend")
-
-  train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
-
+  # bag the data
+  # - randomly sample the data with replacement (duplicate are possible)
+  if (sample_data == TRUE) {
+    train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
+  } else {
+    train <- data
+  }
   train <- dplyr::arrange(train, trend)
   rownames(train) <- seq(1:nrow(train))
   # randomly sample features
@@ -457,5 +342,203 @@ for(i in 1:1000) {
   formula_new <-
     as.formula(paste0(target, " ~ ", paste0(features_sample,
                                             collapse =  " + ")))
-  tree <- reg_tree(formula_new, train, penalty = 0.9)
+  # fit the regression tree
+  if(!is.null(penalties)) {
+    # "cross-validate" by testing the tree for each penalty over the most recent four years
+    
+    #get test and training data.frames
+    train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
+    test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
+    rownames(test_df) <- seq(1:nrow(test_df))
+    
+    min_penalty <- min(penalties)
+    max_penalty <- max(penalties)
+    
+    #get initial penalty values to try
+    set.seed(90210)
+    N <- length(penalties)/5
+    N <- ifelse(N %% 2 == 0, N, N + 1)
+    rand_penalties <- runif(N, min = min(penalties), max = max(penalties))
+    rmses <- c()
+    
+    #get RMSEs for those penalties
+    for(penalty in rand_penalties) {
+      #get a tree built on the training data and the current penalty
+      temp_tree <- reg_tree(formula_new, train_df, minsize = NULL, penalty = penalty)
+      temp_tree_pred <- temp_tree$pred
+      temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
+      
+      #predict each value in test_df
+      tree_predictions <- c()
+      
+      while(length(tree_predictions) < 48 | any(is.na(tree_predictions))) {
+        
+        if(nrow(temp_tree_pred) > 1) {
+          #for every prediction in temp_tree_pred
+          for (i in seq_len(nrow(temp_tree_pred))) {
+            criterion <- temp_tree_pred[i, "criteria"]
+            # extract indices
+            if(!is.na(criterion)) {
+              ind <- as.numeric(rownames(subset(test_df, eval(parse(text = criterion)))))
+            } else {
+              ind <- as.numeric(rownames(data))
+            }
+            #update tree predictions
+            tree_predictions[ind] <- temp_tree_pred[i, "predictions"]
+          }
+        } else {
+          tree_predictions <- rep(temp_tree_pred[1, "predictions"], nrow(test_df))
+        }
+      }
+      
+      #get the RMSE for that penalty
+      ind_var <- as.character(target)
+      temp_df <- data.frame(tree_predictions, test_df[ind_var])
+      names(temp_df) <- c("prediction", "real")
+      temp_rmse <- ModelMetrics::rmse(temp_df$real, temp_df$prediction)
+      rmses <- c(rmses, temp_rmse)
+    }
+    
+    #split into two groups
+    rand_penalty_df <- data.frame(rmses, rand_penalties) %>% 
+      dplyr::arrange(rmses)
+    sorted_rmses <- rand_penalty_df$rmses
+    split_options <- unique(sorted_rmses)
+    differences <- c()
+    for(i in 1:length(split_options)) {
+      ind <- sorted_rmses <= split_options[i]
+      count_lower <- sum(ind)
+      count_higher <- sum(!ind)
+      difference <- abs(count_lower - count_higher)
+      differences <- c(differences, difference)
+    }
+    
+    split_at <- which.min(differences)
+    split_here <- split_options[split_at]
+    ind <- sorted_rmses <= split_here
+    
+    l_function <- sort(rand_penalty_df$rand_penalties[ind]) 
+    g_function <- sort(rand_penalty_df$rand_penalties[!ind])
+    l_distribution <- data.frame(penalties)
+    g_distribution <- data.frame(penalties)
+    uniform_distribution <- unique(dunif(penalties, min = min_penalty, max = max_penalty))
+    #get distributions for l_function
+    for(l in 1:length(l_function)) {
+      mean <- l_function[l]
+      ses <- c(abs(l_function[l]-l_function[l-1]), 
+              abs(l_function[l]-l_function[l+1]),
+              abs(l_function[l]-min_penalty),
+              abs(l_function[l]-max_penalty))
+      se <- min(ses, 0.075, na.rm = TRUE)
+      se <- ifelse(se > 0.01, se, 0.01)
+      dist <- dnorm(penalties, mean = mean, sd = se)
+      normalize_by <- 100/sum(dist)
+      dist <- dist*normalize_by
+      dist <- dnorm(penalties, mean = mean, sd = se)
+      avg_dist <- (dist + uniform_distribution)/2
+      dist_df <- data.frame(avg_dist, penalties)
+      l_distribution <- left_join(l_distribution, dist_df, by = "penalties")
+    }
+    l_distribution$mean <- rowMeans(l_distribution[2:length(l_distribution)])
+    # l_plot <- ggplot(data = l_distribution, aes(x = penalties, y = mean)) +
+    #   geom_point()
+    # 
+    # l_plot
+    
+    #get distributions for g_function
+    for(g in 1:length(g_function)) {
+      mean <- g_function[g]
+      ses <- c(abs(g_function[g]-g_function[g-1]), 
+               abs(g_function[g]-g_function[g+1]),
+               abs(g_function[g]-min_penalty),
+               abs(g_function[g]-max_penalty))
+      se <- min(ses, 0.075, na.rm = TRUE)
+      se <- ifelse(se > 0.01, se, 0.01)
+      dist <- dnorm(penalties, mean = mean, sd = se)
+      normalize_by <- 100/sum(dist)
+      dist <- dist*normalize_by
+      avg_dist <- (dist + uniform_distribution)/2
+      dist_df <- data.frame(avg_dist, penalties)
+      g_distribution <- left_join(g_distribution, dist_df, by = "penalties")
+    }
+    g_distribution$mean <- rowMeans(g_distribution[2:length(g_distribution)])
+    # g_plot <- ggplot(data = g_distribution, aes(x = penalties, y = mean)) +
+    #   geom_point()
+    # 
+    # g_plot
+    
+    #now we draw many candidates from l_distribution
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    rmses <- c()
+    for(penalty in penalties) {
+      #get a tree built on the training data and the current penalty
+      temp_tree <- reg_tree(formula_new, train_df, minsize = NULL, penalty = penalty)
+      temp_tree_pred <- temp_tree$pred
+      temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
+      
+      #predict each value in test_df
+      tree_predictions <- c()
+      
+      while(length(tree_predictions) < 48 | any(is.na(tree_predictions))) {
+        
+        if(nrow(temp_tree_pred) > 1) {
+          #for every prediction in temp_tree_pred
+          for (i in seq_len(nrow(temp_tree_pred))) {
+            criterion <- temp_tree_pred[i, "criteria"]
+            # extract indices
+            if(!is.na(criterion)) {
+              ind <- as.numeric(rownames(subset(test_df, eval(parse(text = criterion)))))
+            } else {
+              ind <- as.numeric(rownames(data))
+            }
+            #update tree predictions
+            tree_predictions[ind] <- temp_tree_pred[i, "predictions"]
+          }
+        } else {
+          tree_predictions <- rep(temp_tree_pred[1, "predictions"], nrow(test_df))
+        }
+      }
+      
+      #get the RMSE for that penalty
+      ind_var <- as.character(target)
+      temp_df <- data.frame(tree_predictions, test_df[ind_var])
+      names(temp_df) <- c("prediction", "real")
+      temp_rmse <- ModelMetrics::rmse(temp_df$real, temp_df$prediction)
+      rmses <- c(rmses, temp_rmse)
+    }
+    
+    penalty_df <- t(data.frame(rmses, penalties))
+    best_penalty <- which.min(penalty_df[1,])
+    penalty <- penalty_df[2, best_penalty]
+    
+    graph_df <- data.frame(rmses, penalties)
+    plot <- ggplot(data = graph_df, aes(x = penalties, y = rmses)) +
+      geom_line() +
+      ylim(min(rmses)/1.2, max(rmses)*1.2)
+    
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     penalty = penalty)
+    
+  } else if (is.null(minsize)) {
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     minsize = ceiling(nrow(train) * 0.1))
+  } else {
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     minsize = minsize)
+  }
+  
+  # return the tree
+  return(list(tree = tree, penalty_plot = plot))
 }
