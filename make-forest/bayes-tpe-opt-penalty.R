@@ -636,38 +636,71 @@ for(i in 1:25) {
   grids <- c(grids, grid)
   
   bayes <- list()
-  bayes$penalty <- bayes_tree$bayes_tree$penalty
-  bayes$time <- bayes_tree$bayes_tree$time
+  bayes$penalty <- bayes_tree$tree$penalty
+  bayes$time <- bayes_tree$tree$time
   bayes$l_plot <- bayes_tree$l_plot
   bayess <- c(bayess, bayes)
 }
 
-plot_num <- 25
+penalty_index <- seq(1, 75, by = 3)
+time_index <- penalty_index + 1
+plot_index <- time_index + 1
+
+penalty_bayes <- bayess[penalty_index]
+penalty_bayes <- do.call(rbind, penalty_bayes)
+penalty_grid <- grids[penalty_index]
+penalty_grid <- do.call(rbind, penalty_grid)
+
+time_bayes <- bayess[time_index]
+time_bayes <- do.call(rbind, time_bayes)
+time_grid <- grids[time_index]
+time_grid <- do.call(rbind, time_grid)
+
+plot_bayes <- bayess[plot_index]
+plot_grid <- grids[plot_index]
+
+penalties_df <- data.frame(bayes = penalty_bayes, grid = penalty_grid)
+names(penalties_df) <- c("bayes", "grid")
+times_df <- data.frame(bayes = time_bayes, grid = time_grid)
+names(times_df) <- c("bayes", "grid")
+rownames(penalties_df) <- seq(1, nrow(penalties_df))
+rownames(times_df) <- rownames(penalties_df)
+
+bayes_time <- sum(times_df$bayes)
+grid_time <- sum(times_df$grid)
+bayes_time/grid_time
+
+plot_num <- 24
 
 ggpubr::ggarrange(plot_bayes[[plot_num]], plot_grid[[plot_num]], 
                   nrow = 2)
 
-# numbers 7, 10, 11, 16, 20, 25 are slightly wrong
-# numbers 18, 19, 22, 23, 24 are wrong
-# half the time, no difference
-# worst difference: 1.539648e-04 on number 19
-# done in  0.7464791 the time
+
+# 14/25, no difference
+# worst difference: 3.301966e-04 (this was 2x worse than next-worse)
+# done in  0.3868788 the time
 
 rmses <- do.call(rbind, plot_grid)
 rmses <- rmses[1:26]
-test_df <- do.call(cbind, rmses)
+rmse_df <- data.frame(penalties = seq(0.7, 0.99, by = 0.01))
+for(i in 1:length(rmses)) {
+  temp_df <- rmses[[i]]
+  names(temp_df) <- c(as.character(i), "penalties")
+  rmse_df <- left_join(rmse_df, temp_df)
+}
+
 
 bayes_rmses <- c()
 grid_rmses <- c()
-for(i in 1:26) {
-  search_vector <- test_df[, i*2]
-  rmse_vector <- test_df[, i*2 - 1]
+search_vector <- rmse_df$penalties
+for(i in 1:25) {
+  rmse_vector <- rmse_df[,i + 1]
   
-  bayes_penalty <- penalties$bayes[i]
+  bayes_penalty <- penalties_df$bayes[i]
   bayes_index <- search_vector == bayes_penalty
   bayes_rmse <- rmse_vector[bayes_index]
   
-  grid_penalty <- penalties$grid[i]
+  grid_penalty <- penalties_df$grid[i]
   grid_index <- search_vector == grid_penalty
   grid_rmse <- rmse_vector[grid_index]
   
