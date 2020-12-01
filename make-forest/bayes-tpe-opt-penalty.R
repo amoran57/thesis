@@ -329,7 +329,7 @@ grid_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize 
 }
 
 #bayesian
-get_rmses <- function(these_penalties, formula, train_df, test_df) {
+get_rmses <- function(these_penalties, formula, train_df, test_df, target) {
   rmses <- c()
   for(penalty in these_penalties) {
     #get a tree built on the training data and the current penalty
@@ -422,7 +422,8 @@ generate_custom_random <- function(l_distribution) {
   l_distribution$rule <- paste0("randNum <= ", as.character(l_distribution$cumsum))
   l_distribution$other_rule <- c("randNum > 0", paste0("randNum > ", as.character(l_distribution$cumsum[-nrow(l_distribution)])))
   l_distribution$rule <- paste0(l_distribution$rule, " & ", l_distribution$other_rule)
-  l_map <- data.frame(penalties = l_distribution$penalties, rule = as.character(l_distribution$rule))
+  l_map <- data.frame(penalties = l_distribution$penalties, rule = l_distribution$rule)
+  l_map$rule <- as.character(l_map$rule)
   
   #then we generate 10 random numbers from a uniform distribution
   rand_unis <- runif(10, min = 0, max = 100)
@@ -516,7 +517,7 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
     # rand_penalties <- round(runif(N, min = min_penalty*100, max = max_penalty*100))/100
     
     #get scores from random penalties above
-    rmses <- get_rmses(rand_penalties, formula_new, train_df, test_df)
+    rmses <- get_rmses(rand_penalties, formula_new, train_df, test_df, target)
     
     #create an object to store penalties and scores
     history <- data.frame(penalties = rand_penalties, score = rmses)
@@ -558,7 +559,7 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
           next_rmse <- history$score[history$penalties == next_penalty]
         } else {
           #if we haven't seen it yet, we'll calculate the RMSE
-          next_rmse <- get_rmses(next_penalty, formula_new, train_df, test_df)
+          next_rmse <- get_rmses(next_penalty, formula_new, train_df, test_df, target)
         }
         new_rmses <- c(new_rmses, next_rmse)
         #step 6
@@ -596,7 +597,6 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
                      data = train,
                      penalty = best_penalty)
     bayes_tree$time <- bayes_time
-    bayes_tree$l_plot <- l_plot
     
   } else if (is.null(minsize)) {
     tree <- reg_tree(formula = formula_new,
@@ -609,7 +609,7 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
   }
   
   # return the tree
-  return(bayes_tree)
+  return(list(tree = bayes_tree, l_plot = l_plot))
 }
 
 
