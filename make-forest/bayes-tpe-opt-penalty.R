@@ -28,7 +28,7 @@ call <- as.formula(call)
 penalties <- seq(0.70, 0.99, by = 0.01)
 
 formula <- call
-feature_frac <- 1
+feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd[sample(1:nrow(infl_mbd), size = nrow(infl_mbd), replace = TRUE),]
@@ -544,7 +544,12 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
       
       #step 2
       l_distribution <- get_distribution(l_function, min_penalty, max_penalty, uniform_distribution)
-      g_distribution <- get_distribution(g_function, min_penalty, max_penalty, uniform_distribution)
+      if(length(l_function) != nrow(history)) {
+        g_distribution <- get_distribution(g_function, min_penalty, max_penalty, uniform_distribution)
+      } else {
+        g_distribution <- data.frame(penalties, mean = rep(uniform_distribution))
+      }
+      
       
       #step 3
       new_random_penalties <- generate_custom_random(l_distribution)
@@ -565,23 +570,9 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
         #step 6
         history <- rbind(history, c(next_penalty, next_rmse))
       }
-      # # old step 6
-      # for(j in 1:length(new_rmses)) {
-      #   next_penalty <- next_penalties[j]
-      #   new_rmse <- new_rmses[j]
-      #   if(new_rmse <= split_here) {
-      #     #put it into the l_distribution
-      #     l_function <- sort(c(next_penalty, l_function))
-      #     l_distribution <- get_distribution(l_function, min_penalty, max_penalty, uniform_distribution)
-      #   } else {
-      #     #put it into the g_distribution
-      #     g_function <- sort(c(next_penalty, g_function))
-      #     g_distribution <- get_distribution(g_function, min_penalty, max_penalty, uniform_distribution)
-      #   }
-      # }
     }
     
-    #now we have 25 total iterations -- good enough for me!
+    #now we have half of the total possible iterations -- good enough for me!
     
     #grab the "best" penalty
     best_penalties <- evaluate_penalties(penalties, l_distribution, g_distribution)
@@ -612,12 +603,103 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
   return(list(tree = bayes_tree, l_plot = l_plot))
 }
 
+#forest
+bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+  # apply the rf_tree function n_trees times with plyr::raply
+  # - track the progress with a progress bar
+  trees <- plyr::raply(
+    n_trees,
+    bayesian_sprout_tree(
+      formula = formula,
+      feature_frac = feature_frac,
+      sample_data = sample_data,
+      minsize = minsize,
+      data = data,
+      penalties = penalties
+    ),
+    .progress = "text"
+  )
+  
+  return(trees)
+}
+grid_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+  # apply the rf_tree function n_trees times with plyr::raply
+  # - track the progress with a progress bar
+  trees <- plyr::raply(
+    n_trees,
+    grid_sprout_tree(
+      formula = formula,
+      feature_frac = feature_frac,
+      sample_data = sample_data,
+      minsize = minsize,
+      data = data,
+      penalties = penalties
+    ),
+    .progress = "text"
+  )
+  
+  return(trees)
+}
+
 
 
 #test timing
-bayes <- bayesian_sprout_tree(formula, feature_frac, sample_data, data = data, penalties = penalties)
-grid <- grid_sprout_tree(formula, feature_frac, sample_data, data = data, penalties = penalties)
+tic("bayes rf")
+bayes <- bayes_reg_rf(formula, data = infl_mbd, penalties = penalties)
+toc()
 
+tic("grid rf")
+grid <- grid_reg_rf(formula, data = infl_mbd, penalties = penalties)
+toc()
+
+fit_df <- data.frame(seq(1,729))
+#find fit
+for(i in 1:50) {
+  temp_forest <- bayes[[i]]
+  temp_fit <- temp_forest$fit
+  fit_df <- cbind(fit_df, temp_fit)
+}
+
+fit_df <- fit_df[-1]
+fit_df$mean <- rowMeans(fit_df)
+bayes_ts <- ts(fit_df$mean, start = c(1959, 1), frequency = 12)
+
+y_train <- infl_mbd[,1]
+X_train <- infl_mbd[,-1]
+fit_rf <- randomForest(X_train, y_train)
+package_fit <- fit_rf$predicted
+package_ts <- ts(package_fit, start = c(1959, 1), frequency = 12)
+#find bad data -----------------
+for(i in 1:1000){
+  # extract features
+  features <- all.vars(formula)[-1]
+  # extract target
+  target <- all.vars(formula)[1]
+  #add data trend
+  data <- infl_mbd
+  data$trend <- seq(1:nrow(data))
+  features <- c(features, "trend")
+  # bag the data
+  train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
+  train <- dplyr::arrange(train, trend)
+  rownames(train) <- seq(1:nrow(train))
+  # randomly sample features
+  # - only fit the regression tree with feature_frac * 100 % of the features
+  features_sample <- sample(features,
+                            size = ceiling(length(features) * feature_frac),
+                            replace = FALSE)
+  # create new formula
+  formula_new <-
+    as.formula(paste0(target, " ~ ", paste0(features_sample,
+                                            collapse =  " + ")))
+  tree <- bayesian_sprout_tree(formula_new, feature_frac = 1, sample_data = FALSE, data = train, penalties = penalties)
+}
+
+
+
+
+
+# verify efficiency ----------------------------------
 ggpubr::ggarrange(bayes$l_plot, grid$penalty_plot, 
           nrow = 2)
 

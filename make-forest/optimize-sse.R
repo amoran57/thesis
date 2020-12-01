@@ -26,6 +26,10 @@ call <- paste0("t ~ ", ind)
 call <- as.formula(call)
 
 penalties <- seq(0.75, 0.99, by = 0.01)
+feature_frac <- 1
+data <- infl_mbd[sample(1:nrow(infl_mbd), size = nrow(infl_mbd), replace = TRUE),]
+sample_data <- FALSE
+
 
 sse_var <- function(x, y) {
   this_df <- data.frame(x,y) %>% 
@@ -423,16 +427,16 @@ reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE
 
 tic("slow")
 slow <- plyr::raply(
-  25,
-  sprout_tree(call, 0.7, data = infl_mbd, penalties = penalties),
+  1,
+  sprout_tree(call, feature_frac, sample_data, data = data, penalties = penalties),
   .progress = "text"
 )
 toc()
 
 tic("fast")
 fast <- plyr::raply(
-  50,
-  new_sprout_tree(call, 0.7, data = infl_mbd, penalties = penalties),
+  1,
+  new_sprout_tree(call, feature_frac, sample_data, data = data, penalties = penalties),
   .progress = "text"
 )
 toc()
