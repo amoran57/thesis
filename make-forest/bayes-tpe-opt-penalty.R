@@ -504,53 +504,52 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
     
     min_penalty <- min(penalties)
     max_penalty <- max(penalties)
+    uniform_distribution <- unique(dunif(penalties, min = min_penalty, max = max_penalty))
     
     #get initial penalty values to try
-    N <- ceiling(length(penalties)/3)
+    N <- ceiling(length(penalties)/5)
     N <- ifelse(N %% 2 == 0, N, N + 1)
-    rand_penalties <- round(runif(N, min = min_penalty*100, max = max_penalty*100))/100
+    # Theoretically we'd use random parameter values, but in a small one-dimensional parameter space like ours
+    # I think this initial grid search makes sense
+    rand_penalty_index <- round(seq(1, length.out = N, by = length(penalties)/N))
+    rand_penalties <- penalties[rand_penalty_index]
+    # rand_penalties <- round(runif(N, min = min_penalty*100, max = max_penalty*100))/100
     
+    #get scores from random penalties above
     rmses <- get_rmses(rand_penalties, formula_new, train_df, test_df)
-    split <- split_lg(rmses, rand_penalties)
-
-    ind <- split$ind
-    split_here <- split$split_here
-    l_function <- split$l_function
-    g_function <- split$g_function
-
-    uniform_distribution <- unique(dunif(penalties, min = min_penalty, max = max_penalty))
-    l_distribution <- get_distribution(l_function, min_penalty, max_penalty, uniform_distribution)
-    g_distribution <- get_distribution(g_function, min_penalty, max_penalty, uniform_distribution)
-   
-    
-    # l_plot <- ggplot(data = l_distribution, aes(x = penalties, y = mean)) +
-    #   geom_point()
-    # l_plot
-    # 
-    # g_plot <- ggplot(data = g_distribution, aes(x = penalties, y = mean)) +
-    #   geom_point()
-    # g_plot
-    
-    #now we have our initial conditions
-    #to proceed:
-    #step 1 -- generate 10 random penalties from the l_distribution
-    #step 2 -- see which of the 10 penalties are the best
-    #step 3 -- get the RMSE from those penalty
-    #step 4 -- insert that penalty, RMSE pair into either your l or g_distribution
-    #step 5 -- start over! get 10 random penalties from the l_distribution, etc.
-    
-    #this Bayesian scheme will only run 3/5 as many evaluations as a gridwise search
-    num_iterations <- ceiling(0.6*length(penalties)) - N
     
     #create an object to store penalties and scores
     history <- data.frame(penalties = rand_penalties, score = rmses)
     
+    #this Bayesian scheme will only run 3/5 as many evaluations as a gridwise search
+    num_iterations <- ceiling((ceiling(0.5*length(penalties)) - N)/3)
+    
+    #this is the part to iterate
+    #now we have our initial conditions
+    #to proceed:
+    #step 1 -- split our history into two penalty vectors
+    #step 2 -- get the distributions for each penalty vector
+    #step 3 -- generate 10 random penalties from the l_distribution
+    #step 4 -- see which of the 10 penalties are the best
+    #step 5 -- get the RMSE from those penalty
+    #step 6 -- feed it back into our history and start over
+    #step 7 -- start over! get 10 random penalties from the l_distribution, etc.
+    
     for(i in 1:num_iterations) {
       #step 1
-      new_random_penalties <- generate_custom_random(l_distribution)
+      split <- split_lg(history$score, history$penalties)
+      l_function <- split$l_function
+      g_function <- split$g_function
+      
       #step 2
-      next_penalties <- evaluate_penalties(new_random_penalties, l_distribution, g_distribution)
+      l_distribution <- get_distribution(l_function, min_penalty, max_penalty, uniform_distribution)
+      g_distribution <- get_distribution(g_function, min_penalty, max_penalty, uniform_distribution)
+      
       #step 3
+      new_random_penalties <- generate_custom_random(l_distribution)
+      #step 4
+      next_penalties <- evaluate_penalties(new_random_penalties, l_distribution, g_distribution)
+      #step 5
       new_rmses <- c()
       for(next_penalty in next_penalties) {
         #let's check if we've already evaluated this penalty
@@ -562,22 +561,23 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
           next_rmse <- get_rmses(next_penalty, formula_new, train_df, test_df)
         }
         new_rmses <- c(new_rmses, next_rmse)
+        #step 6
         history <- rbind(history, c(next_penalty, next_rmse))
       }
-      #step 4
-      for(j in 1:length(new_rmses)) {
-        next_penalty <- next_penalties[j]
-        new_rmse <- new_rmses[j]
-        if(new_rmse <= split_here) {
-          #put it into the l_distribution
-          l_function <- sort(c(next_penalty, l_function))
-          l_distribution <- get_distribution(l_function, min_penalty, max_penalty, uniform_distribution)
-        } else {
-          #put it into the g_distribution
-          g_function <- sort(c(next_penalty, g_function))
-          g_distribution <- get_distribution(g_function, min_penalty, max_penalty, uniform_distribution)
-        }
-      }
+      # # old step 6
+      # for(j in 1:length(new_rmses)) {
+      #   next_penalty <- next_penalties[j]
+      #   new_rmse <- new_rmses[j]
+      #   if(new_rmse <= split_here) {
+      #     #put it into the l_distribution
+      #     l_function <- sort(c(next_penalty, l_function))
+      #     l_distribution <- get_distribution(l_function, min_penalty, max_penalty, uniform_distribution)
+      #   } else {
+      #     #put it into the g_distribution
+      #     g_function <- sort(c(next_penalty, g_function))
+      #     g_distribution <- get_distribution(g_function, min_penalty, max_penalty, uniform_distribution)
+      #   }
+      # }
     }
     
     #now we have 25 total iterations -- good enough for me!
@@ -596,6 +596,7 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
                      data = train,
                      penalty = best_penalty)
     bayes_tree$time <- bayes_time
+    bayes_tree$l_plot <- l_plot
     
   } else if (is.null(minsize)) {
     tree <- reg_tree(formula = formula_new,
@@ -608,7 +609,7 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
   }
   
   # return the tree
-  return(list(bayes_tree = bayes_tree, l_plot = l_plot))
+  return(bayes_tree)
 }
 
 
@@ -619,3 +620,65 @@ grid <- grid_sprout_tree(formula, feature_frac, sample_data, data = data, penalt
 
 ggpubr::ggarrange(bayes$l_plot, grid$penalty_plot, 
           nrow = 2)
+
+grids <- list()
+bayess <- list()
+
+for(i in 1:25) {
+  data <- infl_mbd[sample(1:nrow(infl_mbd), size = nrow(infl_mbd), replace = TRUE),]
+  grid_tree <- grid_sprout_tree(call, feature_frac, sample_data, data = data, penalties = penalties)
+  bayes_tree <- bayesian_sprout_tree(call, feature_frac, sample_data, data = data, penalties = penalties)
+  
+  grid <- list()
+  grid$penalty <- grid_tree$grid_tree$penalty
+  grid$time <- grid_tree$grid_tree$time
+  grid$penalty_plot <- grid_tree$penalty_plot
+  grids <- c(grids, grid)
+  
+  bayes <- list()
+  bayes$penalty <- bayes_tree$bayes_tree$penalty
+  bayes$time <- bayes_tree$bayes_tree$time
+  bayes$l_plot <- bayes_tree$l_plot
+  bayess <- c(bayess, bayes)
+}
+
+plot_num <- 25
+
+ggpubr::ggarrange(plot_bayes[[plot_num]], plot_grid[[plot_num]], 
+                  nrow = 2)
+
+# numbers 7, 10, 11, 16, 20, 25 are slightly wrong
+# numbers 18, 19, 22, 23, 24 are wrong
+# half the time, no difference
+# worst difference: 1.539648e-04 on number 19
+# done in  0.7464791 the time
+
+rmses <- do.call(rbind, plot_grid)
+rmses <- rmses[1:26]
+test_df <- do.call(cbind, rmses)
+
+bayes_rmses <- c()
+grid_rmses <- c()
+for(i in 1:26) {
+  search_vector <- test_df[, i*2]
+  rmse_vector <- test_df[, i*2 - 1]
+  
+  bayes_penalty <- penalties$bayes[i]
+  bayes_index <- search_vector == bayes_penalty
+  bayes_rmse <- rmse_vector[bayes_index]
+  
+  grid_penalty <- penalties$grid[i]
+  grid_index <- search_vector == grid_penalty
+  grid_rmse <- rmse_vector[grid_index]
+  
+  bayes_rmses <- c(bayes_rmses, bayes_rmse)
+  grid_rmses <- c(grid_rmses, grid_rmse)
+}
+
+rmses_df <- data.frame(bayes = bayes_rmses, grid = grid_rmses)
+rmses_df$index <- seq(1:nrow(rmses_df))
+rmses_df <- rmses_df %>% 
+  dplyr::mutate(diff = bayes - grid)
+plot <- ggplot(data = rmses_df, aes(x = index, y = diff)) +
+  geom_line()
+plot
