@@ -468,9 +468,11 @@ evaluate_penalties <- function(these_penalties, l_distribution, g_distribution) 
 }
 bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # extract features
-  features <- all.vars(formula)[-1]
+  features <- all.vars(formula)[-c(1:2)]
   # extract target
   target <- all.vars(formula)[1]
+  #make sure we include first lag
+  first_lag <- all.vars(formula)[2]
   #add data trend
   data$trend <- seq(1:nrow(data))
   features <- c(features, "trend")
@@ -490,7 +492,7 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
                             replace = FALSE)
   # create new formula
   formula_new <-
-    as.formula(paste0(target, " ~ ", paste0(features_sample,
+    as.formula(paste0(target, " ~ ", first_lag, " + ", paste0(features_sample,
                                             collapse =  " + ")))
   # fit the regression tree
   if(!is.null(penalties)) {
