@@ -430,7 +430,7 @@ get_lag_errors <- function(formula, data, penalty) {
   
   return(train_df)
 }
-bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+bayesian_sprout_tree_with_lag <- function(formula, feature_frac, sample_data = FALSE, minsize = NULL, data, penalties = NULL) {
   # extract features
   features <- all.vars(formula)[-c(1:2)]
   # extract target
@@ -439,7 +439,6 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
   first_lag <- all.vars(formula)[2]
   #add data trend
   data$trend <- seq(1:nrow(data))
-  features <- c(features, "trend")
   # bag the data
   # - randomly sample the data with replacement (duplicate are possible)
   if (sample_data == TRUE) {
@@ -456,7 +455,7 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
                             replace = FALSE)
   # create new formula
   formula_new <-
-    as.formula(paste0(target, " ~ ", first_lag, " + ", paste0(features_sample,
+    as.formula(paste0(target, " ~ ", first_lag, " + trend + ", paste0(features_sample,
                                                               collapse =  " + ")))
   # fit the regression tree
   if(!is.null(penalties)) {
@@ -577,4 +576,5 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
   return(list(tree = bayes_tree, l_plot = l_plot))
 }
 
+bayes <- bayesian_sprout_tree_with_lag(formula, feature_frac = 0.5, data = infl_mbd, penalties = penalties)
 
