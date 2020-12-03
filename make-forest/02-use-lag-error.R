@@ -28,10 +28,10 @@ call <- as.formula(call)
 penalties <- seq(0.70, 0.99, by = 0.01)
 
 formula <- call
-feature_frac <- 0.7
+feature_frac <- 0.5
 sample_data <- FALSE
 minsize <- NULL
-data <- infl_mbd[sample(1:nrow(infl_mbd), size = nrow(infl_mbd), replace = TRUE),]
+data <- infl_mbd
 # Functions ------------------------------------------------
 
 #foundational
@@ -72,7 +72,7 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
   
   # coerce to data.frame
   data <- as.data.frame(data)
-  
+  rownames(data) <- seq(1, nrow(data))
   # handle formula
   formula <- terms.formula(formula)
   
@@ -273,6 +273,7 @@ get_rmses <- function(these_penalties, formula, train_df, test_df, target) {
     error_vector <- error_vector[-length(error_vector)]
     test_df <- test_df[-1,]
     test_df$lag_error <- error_vector
+    rownames(test_df) <- seq(1, nrow(test_df))
     
     #now let's call to the function that will attach lagged error terms to our train set.
     new_train_df <- get_lag_errors(formula, train_df, penalty)
@@ -427,6 +428,7 @@ get_lag_errors <- function(formula, data, penalty) {
   
   #attach lagged errors
   train_df$lag_error <- lag_errors
+  rownames(train_df) <- seq(1, nrow(train_df))
   
   return(train_df)
 }
@@ -483,6 +485,7 @@ bayesian_sprout_tree_with_lag <- function(formula, feature_frac, sample_data = F
     
     #get scores from random penalties above
     rmses <- get_rmses(rand_penalties, formula_new, train_df, test_df, target)
+
     
     #create an object to store penalties and scores
     history <- data.frame(penalties = rand_penalties, score = rmses)
@@ -554,7 +557,7 @@ bayesian_sprout_tree_with_lag <- function(formula, feature_frac, sample_data = F
     data_with_errors <- get_lag_errors(formula_new, train, best_penalty)
     character_formula <- paste(as.character(formula)[2], as.character(formula)[1], as.character(formula)[3])
     formula_with_errors <- paste0(character_formula, " + lag_error")
-    formula_with_errors <- as.formula(fformula_with_errors)
+    formula_with_errors <- as.formula(formula_with_errors)
 
     #now at last we can fit our tree
     bayes_tree <- reg_tree(formula = formula_with_errors,
