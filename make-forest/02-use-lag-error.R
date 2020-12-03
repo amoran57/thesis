@@ -28,7 +28,7 @@ call <- as.formula(call)
 penalties <- seq(0.70, 0.99, by = 0.01)
 
 formula <- call
-feature_frac <- 0.5
+feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
@@ -440,7 +440,7 @@ bayesian_sprout_tree_with_lag <- function(formula, feature_frac, sample_data = F
   #make sure we include first lag
   first_lag <- all.vars(formula)[2]
   #add data trend
-  data$trend <- seq(1:nrow(data))
+  data$trend <- seq(1,nrow(data))
   # bag the data
   # - randomly sample the data with replacement (duplicate are possible)
   if (sample_data == TRUE) {
@@ -579,5 +579,26 @@ bayesian_sprout_tree_with_lag <- function(formula, feature_frac, sample_data = F
   return(list(tree = bayes_tree, l_plot = l_plot))
 }
 
+#forest
+bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+  # apply the rf_tree function n_trees times with plyr::raply
+  # - track the progress with a progress bar
+  trees <- plyr::raply(
+    n_trees,
+    bayesian_sprout_tree_with_lag(
+      formula = formula,
+      feature_frac = feature_frac,
+      sample_data = sample_data,
+      minsize = minsize,
+      data = data,
+      penalties = penalties
+    ),
+    .progress = "text"
+  )
+  
+  return(trees)
+}
+
 bayes <- bayesian_sprout_tree_with_lag(formula, feature_frac = 0.5, data = infl_mbd, penalties = penalties)
 
+bayes_forest <- bayes_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
