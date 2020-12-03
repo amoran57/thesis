@@ -654,6 +654,9 @@ tic("grid rf")
 grid <- grid_reg_rf(formula, data = infl_mbd, penalties = penalties)
 toc()
 
+bayes_tree <- bayesian_sprout_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
+bayes_tree_fit <- bayes_tree$tree$fit
+
 fit_df <- data.frame(seq(1,729))
 #find fit
 for(i in 1:50) {
@@ -665,6 +668,7 @@ for(i in 1:50) {
 fit_df <- fit_df[-1]
 fit_df$mean <- rowMeans(fit_df)
 bayes_ts <- ts(fit_df$mean, start = c(1959, 1), frequency = 12)
+bayes_tree_ts <- ts(bayes_tree_fit, start = c(1959, 1), frequency = 12)
 
 y_train <- infl_mbd[,1]
 X_train <- infl_mbd[,-1]
