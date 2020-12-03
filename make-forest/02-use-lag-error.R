@@ -599,6 +599,17 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
   return(trees)
 }
 
-bayes <- bayesian_sprout_tree_with_lag(formula, feature_frac = 0.5, data = infl_mbd, penalties = penalties)
+bayes <- bayes_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
 
-bayes_forest <- bayes_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
+#get accuracy
+fit_df <- data.frame(seq(1,728))
+#find fit
+for(i in 1:50) {
+  temp_forest <- bayes[[i]]
+  temp_fit <- temp_forest$fit
+  fit_df <- cbind(fit_df, temp_fit)
+}
+
+fit_df <- fit_df[-1]
+fit_df$mean <- rowMeans(fit_df)
+bayes_ts <- ts(fit_df$mean, start = c(1959, 2), frequency = 12)
