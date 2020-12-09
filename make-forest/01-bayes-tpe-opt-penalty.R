@@ -667,14 +667,23 @@ for(i in 1:50) {
 
 fit_df <- fit_df[-1]
 fit_df$mean <- rowMeans(fit_df)
-bayes_ts <- ts(fit_df$mean, start = c(1959, 1), frequency = 12)
-bayes_tree_ts <- ts(bayes_tree_fit, start = c(1959, 1), frequency = 12)
+bayes_ts <- ts(fit_df$mean, start = c(1959, 12), frequency = 12)
+bayes_tree_ts <- ts(bayes_tree_fit, start = c(1959, 12), frequency = 12)
 
 y_train <- infl_mbd[,1]
 X_train <- infl_mbd[,-1]
 fit_rf <- randomForest(X_train, y_train)
 package_fit <- fit_rf$predicted
-package_ts <- ts(package_fit, start = c(1959, 1), frequency = 12)
+package_ts <- ts(package_fit, start = c(1959, 12), frequency = 12)
+
+arima_fit <- auto.arima(tsData)$fitted
+arima_ts <- ts(arima_fit, start = c(1959, 1), frequency = 12)
+
+accuracy(tsData, bayes_ts)
+accuracy(tsData, bayes_tree_ts)
+accuracy(tsData, package_ts)
+accuracy(tsData, arima_ts)
+
 #find bad data -----------------
 for(i in 1:1000){
   # extract features

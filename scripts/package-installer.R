@@ -9,6 +9,7 @@ install.packages(c("dplyr",
                    "randomForest",
                    "tictoc",
                    "readr",
-                   "vars"
+                   "vars",
+                   "ggpubr"
                    ))
                  
