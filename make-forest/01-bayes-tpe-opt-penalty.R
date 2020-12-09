@@ -679,10 +679,19 @@ package_ts <- ts(package_fit, start = c(1959, 12), frequency = 12)
 arima_fit <- auto.arima(tsData)$fitted
 arima_ts <- ts(arima_fit, start = c(1959, 1), frequency = 12)
 
+normal_tree <- reg_tree(formula, infl_mbd, penalty = 0.9)
+normal_tree_ts <- ts(normal_tree$fit, start = c(1959, 12), frequency = 12)
+
+grid_tree <- grid_sprout_tree(formula, 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
+grid_tree_fit <- grid_tree$grid_tree$fit
+grid_tree_ts <- ts(grid_tree_fit, start = c(1959, 12), frequency = 12)
+
 accuracy(tsData, bayes_ts)
 accuracy(tsData, bayes_tree_ts)
 accuracy(tsData, package_ts)
 accuracy(tsData, arima_ts)
+accuracy(tsData, normal_tree_ts)
+accuracy(tsData, grid_tree_ts)
 
 #find bad data -----------------
 for(i in 1:1000){
@@ -715,7 +724,7 @@ for(i in 1:1000){
 
 
 # verify efficiency ----------------------------------
-ggpubr::ggarrange(bayes$l_plot, grid$penalty_plot, 
+ggpubr::ggarrange(bayes_tree$l_plot, grid_tree$penalty_plot, 
           nrow = 2)
 
 grids <- list()
