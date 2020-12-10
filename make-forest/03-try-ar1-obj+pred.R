@@ -26,6 +26,7 @@ call <- paste0("t ~ ", ind)
 call <- as.formula(call)
 
 penalties <- seq(0.70, 0.99, by = 0.01)
+penalty <- 0.9
 
 formula <- call
 feature_frac <- 0.7
@@ -51,20 +52,18 @@ new_obj_function <- function(x, y, lag) {
     
     first_y <- y[x < sp]
     first_lag <- lag[x < sp]
-    first_df <- data.frame(first_y, first_lag)
     second_y <- y[x >= sp]
     second_lag <- lag[x >= sp]
-    second_df <- data.frame(second_y, second_lag)
     
-    if(nrow(first_df) > 0) {
-      first_reg <- lm(first_y ~ first_lag, data = first_df)
+    if(length(first_y) > 0) {
+      first_reg <- lm(first_y ~ first_lag)
       first_residuals <- first_reg$residuals
       first_ssr <- sum(first_residuals^2)
     } else {
       first_ssr <- 0
     }
 
-    second_reg <- lm(second_y ~ second_lag, data = second_df)
+    second_reg <- lm(second_y ~ second_lag)
     second_residuals <- second_reg$residuals
     second_ssr <- sum(second_residuals^2)
     
@@ -289,6 +288,7 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
   tree_info <- data.frame(NODE = 1, NOBS = nrow(data), FILTER = NA, TERMINAL = "SPLIT",
                           stringsAsFactors = FALSE)
   
+  tic("build tree")
   # keep splitting until there are only leafs left
   while(do_splits) {
     
@@ -400,13 +400,15 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
       do_splits <- !all(tree_info$TERMINAL != "SPLIT")
     } # end for
   } # end while
+  toc()
   
-  
+  tic("get fits")
   # calculate fitted values, sorting criteria, and predictions for each criterion
   leafs <- tree_info[tree_info$TERMINAL == "LEAF", ]
   fitted <- c()
   criteria <- c()
-  predictions <- c()
+  constants <- c()
+  beta_hats <- c()
   for (i in seq_len(nrow(leafs))) {
     criterion <- leafs[i, "FILTER"]
     # extract index
@@ -416,25 +418,28 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
       ind <- as.numeric(rownames(data))
     }
     
-    # estimator is the mean y value of the leaf
-    mean_ind <- mean(y[ind])
-    fitted[ind] <- mean_ind
-    predictions[i] <- mean_ind
+    # estimator is the fitted AR(1) value of the leaf 
+    this_leaf_lm <- lm(y[ind] ~ lag[ind])
+    this_leaf_fit <- this_leaf_lm$fitted
+    
+    fitted[ind] <- this_leaf_fit
+    constants[i] <- this_leaf_lm$coefficients[1]
+    beta_hats[i] <- this_leaf_lm$coefficients[2]
     criteria[i] <- criterion
   }
   
-  pred <- data.frame(criteria, predictions)
-  
+  pred <- data.frame(criteria, constants, beta_hats)
+  toc()
   # return everything
   return(list(tree = tree_info, fit = fitted, formula = formula, data = data, pred = pred, penalty = penalty))
 }
 
 #bayesian
-get_rmses <- function(these_penalties, formula, train_df, test_df, target) {
+get_rmses <- function(these_penalties, formula, train_df, test_df, target, lag_name) {
   rmses <- c()
   for(penalty in these_penalties) {
     #get a tree built on the training data and the current penalty
-    temp_tree <- reg_tree(formula, train_df, minsize = NULL, penalty = penalty)
+    temp_tree <- ar1_reg_tree(formula, train_df, minsize = NULL, penalty = penalty, lag_name = lag_name)
     temp_tree_pred <- temp_tree$pred
     temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
     
@@ -453,11 +458,21 @@ get_rmses <- function(these_penalties, formula, train_df, test_df, target) {
           } else {
             ind <- as.numeric(rownames(data))
           }
+          
+          #get the lag and manually compute values
+          this_lag <- test_df[ind, lag_name]
+          this_constant <- temp_tree_pred[i, "constants"]
+          this_beta_hat <- temp_tree_pred[i, "beta_hats"]
+          these_predictions <- this_constant + this_beta_hat*this_lag
+          
           #update tree predictions
-          tree_predictions[ind] <- temp_tree_pred[i, "predictions"]
+          tree_predictions[ind] <- these_predictions
         }
       } else {
-        tree_predictions <- rep(temp_tree_pred[1, "predictions"], nrow(test_df))
+        this_lag <- test_df[, lag_name]
+        this_constant <- temp_tree_pred[1, "constants"]
+        this_beta_hat <- temp_tree_pred[1, "beta_hats"]
+        tree_predictions <- this_constant + this_beta_hat*this_lag
       }
     }
     
@@ -567,7 +582,7 @@ evaluate_penalties <- function(these_penalties, l_distribution, g_distribution) 
   
   return(c(best_penalty, next_best_penalty, third_best_penalty))
 }
-bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # extract features
   features <- all.vars(formula)[-c(1:2)]
   # extract target
@@ -576,7 +591,6 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
   first_lag <- all.vars(formula)[2]
   #add data trend
   data$trend <- seq(1:nrow(data))
-  features <- c(features, "trend")
   # bag the data
   # - randomly sample the data with replacement (duplicate are possible)
   if (sample_data == TRUE) {
@@ -593,7 +607,7 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
                             replace = FALSE)
   # create new formula
   formula_new <-
-    as.formula(paste0(target, " ~ ", first_lag, " + ", paste0(features_sample,
+    as.formula(paste0(target, " ~ ", first_lag, " + trend + ", paste0(features_sample,
                                                               collapse =  " + ")))
   # fit the regression tree
   if(!is.null(penalties)) {
@@ -617,10 +631,9 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
     # I think this initial grid search makes sense
     rand_penalty_index <- round(seq(1, length.out = N, by = length(penalties)/N))
     rand_penalties <- penalties[rand_penalty_index]
-    # rand_penalties <- round(runif(N, min = min_penalty*100, max = max_penalty*100))/100
     
     #get scores from random penalties above
-    rmses <- get_rmses(rand_penalties, formula_new, train_df, test_df, target)
+    rmses <- get_rmses(rand_penalties, formula_new, train_df, test_df, target, lag_name = first_lag)
     
     #create an object to store penalties and scores
     history <- data.frame(penalties = rand_penalties, score = rmses)
@@ -667,16 +680,14 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
           next_rmse <- history$score[history$penalties == next_penalty]
         } else {
           #if we haven't seen it yet, we'll calculate the RMSE
-          next_rmse <- get_rmses(next_penalty, formula_new, train_df, test_df, target)
+          next_rmse <- get_rmses(next_penalty, formula_new, train_df, test_df, target, lag_name = first_lag)
         }
         new_rmses <- c(new_rmses, next_rmse)
         #step 6
         history <- rbind(history, c(next_penalty, next_rmse))
       }
     }
-    
-    #now we have half of the total possible iterations -- good enough for me!
-    
+
     #grab the "best" penalty
     best_penalties <- evaluate_penalties(penalties, l_distribution, g_distribution)
     best_penalty <- best_penalties[1]
@@ -687,19 +698,22 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
     l_plot <- ggplot(data = l_distribution, aes(x = penalties, y = mean)) +
       geom_point()
     
-    bayes_tree <- reg_tree(formula = formula_new,
+    bayes_tree <- ar1_reg_tree(formula = formula_new,
                            data = train,
-                           penalty = best_penalty)
+                           penalty = best_penalty,
+                           lag_name = first_lag)
     bayes_tree$time <- bayes_time
     
   } else if (is.null(minsize)) {
-    tree <- reg_tree(formula = formula_new,
+    tree <- ar1_reg_tree(formula = formula_new,
                      data = train,
-                     minsize = ceiling(nrow(train) * 0.1))
+                     minsize = ceiling(nrow(train) * 0.1),
+                     lag_name = first_lag)
   } else {
-    tree <- reg_tree(formula = formula_new,
+    tree <- ar1_reg_tree(formula = formula_new,
                      data = train,
-                     minsize = minsize)
+                     minsize = minsize,
+                     lag_name = first_lag)
   }
   
   # return the tree
@@ -747,11 +761,14 @@ grid_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data =
 #Use functions ---------------------------
 normal_tree <- reg_tree(formula, data = infl_mbd, penalty = 0.9)
 ar1_tree <- ar1_reg_tree(formula, data = infl_mbd, penalty = 0.9, lag_name = "tmin1")
+bayes_ar1_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
 normal_tree_fit <- normal_tree$fit
 ar1_tree_fit <- ar1_tree$fit
+bayes_ar1_tree_fit <- bayes_ar1_tree$tree$fit
 
 normal_tree_ts <- ts(normal_tree_fit, start = c(1959, 12), frequency = 12)
 ar1_tree_ts <- ts(ar1_tree_fit, start = c(1959, 12), frequency = 12)
+bayes_ar1_tree_ts <- ts(bayes_ar1_tree_fit, start = c(1959, 12), frequency = 12)
 
 
 y_train <- infl_mbd[,1]
@@ -763,136 +780,9 @@ package_ts <- ts(package_fit, start = c(1959, 12), frequency = 12)
 arima_fit <- auto.arima(tsData)$fitted
 arima_ts <- ts(arima_fit, start = c(1959, 1), frequency = 12)
 
+#Accuracy ---------------------
 accuracy(tsData, normal_tree_ts)
 accuracy(tsData, ar1_tree_ts)
+accuracy(tsData, bayes_ar1_tree_ts)
 accuracy(tsData, package_ts)
 accuracy(tsData, arima_ts)
-
-#find bad data -----------------
-for(i in 1:1000){
-  # extract features
-  features <- all.vars(formula)[-1]
-  # extract target
-  target <- all.vars(formula)[1]
-  #add data trend
-  data <- infl_mbd
-  data$trend <- seq(1:nrow(data))
-  features <- c(features, "trend")
-  # bag the data
-  train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
-  train <- dplyr::arrange(train, trend)
-  rownames(train) <- seq(1:nrow(train))
-  # randomly sample features
-  # - only fit the regression tree with feature_frac * 100 % of the features
-  features_sample <- sample(features,
-                            size = ceiling(length(features) * feature_frac),
-                            replace = FALSE)
-  # create new formula
-  formula_new <-
-    as.formula(paste0(target, " ~ ", paste0(features_sample,
-                                            collapse =  " + ")))
-  tree <- bayesian_sprout_tree(formula_new, feature_frac = 1, sample_data = FALSE, data = train, penalties = penalties)
-}
-
-
-
-
-
-# verify efficiency ----------------------------------
-ggpubr::ggarrange(bayes$l_plot, grid$penalty_plot, 
-                  nrow = 2)
-
-grids <- list()
-bayess <- list()
-
-for(i in 1:25) {
-  data <- infl_mbd[sample(1:nrow(infl_mbd), size = nrow(infl_mbd), replace = TRUE),]
-  grid_tree <- grid_sprout_tree(call, feature_frac, sample_data, data = data, penalties = penalties)
-  bayes_tree <- bayesian_sprout_tree(call, feature_frac, sample_data, data = data, penalties = penalties)
-  
-  grid <- list()
-  grid$penalty <- grid_tree$grid_tree$penalty
-  grid$time <- grid_tree$grid_tree$time
-  grid$penalty_plot <- grid_tree$penalty_plot
-  grids <- c(grids, grid)
-  
-  bayes <- list()
-  bayes$penalty <- bayes_tree$tree$penalty
-  bayes$time <- bayes_tree$tree$time
-  bayes$l_plot <- bayes_tree$l_plot
-  bayess <- c(bayess, bayes)
-}
-
-penalty_index <- seq(1, 75, by = 3)
-time_index <- penalty_index + 1
-plot_index <- time_index + 1
-
-penalty_bayes <- bayess[penalty_index]
-penalty_bayes <- do.call(rbind, penalty_bayes)
-penalty_grid <- grids[penalty_index]
-penalty_grid <- do.call(rbind, penalty_grid)
-
-time_bayes <- bayess[time_index]
-time_bayes <- do.call(rbind, time_bayes)
-time_grid <- grids[time_index]
-time_grid <- do.call(rbind, time_grid)
-
-plot_bayes <- bayess[plot_index]
-plot_grid <- grids[plot_index]
-
-penalties_df <- data.frame(bayes = penalty_bayes, grid = penalty_grid)
-names(penalties_df) <- c("bayes", "grid")
-times_df <- data.frame(bayes = time_bayes, grid = time_grid)
-names(times_df) <- c("bayes", "grid")
-rownames(penalties_df) <- seq(1, nrow(penalties_df))
-rownames(times_df) <- rownames(penalties_df)
-
-bayes_time <- sum(times_df$bayes)
-grid_time <- sum(times_df$grid)
-bayes_time/grid_time
-
-plot_num <- 24
-
-ggpubr::ggarrange(plot_bayes[[plot_num]], plot_grid[[plot_num]], 
-                  nrow = 2)
-
-
-# 14/25, no difference
-# worst difference: 3.301966e-04 (this was 2x worse than next-worse)
-# done in  0.3868788 the time
-
-rmses <- do.call(rbind, plot_grid)
-rmses <- rmses[1:26]
-rmse_df <- data.frame(penalties = seq(0.7, 0.99, by = 0.01))
-for(i in 1:length(rmses)) {
-  temp_df <- rmses[[i]]
-  names(temp_df) <- c(as.character(i), "penalties")
-  rmse_df <- left_join(rmse_df, temp_df)
-}
-
-
-bayes_rmses <- c()
-grid_rmses <- c()
-search_vector <- rmse_df$penalties
-for(i in 1:25) {
-  rmse_vector <- rmse_df[,i + 1]
-  
-  bayes_penalty <- penalties_df$bayes[i]
-  bayes_index <- search_vector == bayes_penalty
-  bayes_rmse <- rmse_vector[bayes_index]
-  
-  grid_penalty <- penalties_df$grid[i]
-  grid_index <- search_vector == grid_penalty
-  grid_rmse <- rmse_vector[grid_index]
-  
-  bayes_rmses <- c(bayes_rmses, bayes_rmse)
-  grid_rmses <- c(grid_rmses, grid_rmse)
-}
-
-rmses_df <- data.frame(bayes = bayes_rmses, grid = grid_rmses)
-rmses_df$index <- seq(1:nrow(rmses_df))
-rmses_df <- rmses_df %>% 
-  dplyr::mutate(diff = bayes - grid)
-plot <- ggplot(data = rmses_df, aes(x = index, y = diff)) +
-  geom_line()
-plot
