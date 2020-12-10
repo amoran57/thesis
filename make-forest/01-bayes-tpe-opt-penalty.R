@@ -672,7 +672,7 @@ for(i in 1:50) {
 
 fit_df <- fit_df[-1]
 fit_df$mean <- rowMeans(fit_df)
-bayes_ts <- ts(fit_df$mean, start = c(1959, 12), frequency = 12)
+bayes_forest_ts <- ts(fit_df$mean, start = c(1959, 12), frequency = 12)
 
 grid_fit_df <- data.frame(seq(1,728))
 #find fit
@@ -684,7 +684,7 @@ for(i in 1:50) {
 
 grid_fit_df <- grid_fit_df[-1]
 grid_fit_df$mean <- rowMeans(grid_fit_df)
-grid_ts <- ts(grid_fit_df$mean, start = c(1960, 1), frequency = 12)
+grid_forest_ts <- ts(grid_fit_df$mean, start = c(1960, 1), frequency = 12)
 
 
 y_train <- infl_mbd[,1]
@@ -698,8 +698,8 @@ arima_ts <- ts(arima_fit, start = c(1959, 1), frequency = 12)
 
 
 
-accuracy(tsData, bayes_ts)
-accuracy(tsData, grid_ts)
+accuracy(tsData, bayes_forest_ts)
+accuracy(tsData, grid_forest_ts)
 accuracy(tsData, bayes_tree_ts)
 accuracy(tsData, grid_tree_ts)
 accuracy(tsData, package_ts)
