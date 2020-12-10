@@ -28,7 +28,7 @@ call <- as.formula(call)
 penalties <- seq(0.70, 0.99, by = 0.01)
 
 formula <- call
-feature_frac <- 0.7
+feature_frac <- 1
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
@@ -578,6 +578,84 @@ bayesian_sprout_tree_with_lag <- function(formula, feature_frac, sample_data = F
   # return the tree
   return(list(tree = bayes_tree, l_plot = l_plot))
 }
+grid_sprout_tree_with_lag <- function(formula, feature_frac, sample_data = FALSE, minsize = NULL, data, penalties = NULL) {
+  # extract features
+  features <- all.vars(formula)[-c(1:2)]
+  # extract target
+  target <- all.vars(formula)[1]
+  #make sure we include first lag
+  first_lag <- all.vars(formula)[2]
+  #add data trend
+  data$trend <- seq(1,nrow(data))
+  # bag the data
+  # - randomly sample the data with replacement (duplicate are possible)
+  if (sample_data == TRUE) {
+    train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
+  } else {
+    train <- data
+  }
+  train <- dplyr::arrange(train, trend)
+  rownames(train) <- seq(1:nrow(train))
+  # randomly sample features
+  # - only fit the regression tree with feature_frac * 100 % of the features
+  features_sample <- sample(features,
+                            size = ceiling(length(features) * feature_frac),
+                            replace = FALSE)
+  # create new formula
+  formula_new <-
+    as.formula(paste0(target, " ~ ", first_lag, " + trend + ", paste0(features_sample,
+                                                                      collapse =  " + ")))
+  # fit the regression tree
+  if(!is.null(penalties)) {
+    # "cross-validate" by testing the tree for each penalty over the most recent four years
+    
+    #get test and training data.frames
+    train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
+    test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
+    rownames(test_df) <- seq(1:nrow(test_df))
+    
+    tic("Grid")
+    rmses <- get_rmses(penalties, formula_new, train_df, test_df, target)
+
+    #grab the "best" penalty
+    best_penalty <- penalties[which.min(rmses)]
+    
+    grid_done <- toc()
+    grid_time <- grid_done$toc - grid_done$tic
+    
+    graph_df <- data.frame(rmses, penalties)
+    plot <- ggplot(data = graph_df, aes(x = penalties, y = rmses)) +
+      geom_line() +
+      ylim(min(rmses)/1.2, max(rmses)*1.2)
+
+    #now we've got our best penalty and we want to make a tree
+    #but the penalty we've selected is based on a tree which accounts for a lagged error term
+    #so we have to generate lagged error terms now for our entire dataset
+    data_with_errors <- get_lag_errors(formula_new, train, best_penalty)
+    character_formula <- paste(as.character(formula)[2], as.character(formula)[1], as.character(formula)[3])
+    formula_with_errors <- paste0(character_formula, " + lag_error")
+    formula_with_errors <- as.formula(formula_with_errors)
+    
+    #now at last we can fit our tree
+    grid_tree <- reg_tree(formula = formula_with_errors,
+                           data = data_with_errors,
+                           penalty = best_penalty)
+    grid_tree$time <- grid_time
+    
+  } else if (is.null(minsize)) {
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     minsize = ceiling(nrow(train) * 0.1))
+  } else {
+    tree <- reg_tree(formula = formula_new,
+                     data = train,
+                     minsize = minsize)
+  }
+  
+  # return the tree
+  return(list(grid_tree = grid_tree, penalty_plot = plot))
+}
+
 
 #forest
 bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
@@ -601,6 +679,7 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
 
 bayes_forest_error <- bayes_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
 bayes_tree_error <- bayesian_sprout_tree_with_lag(formula, feature_frac, sample_data, minsize, data, penalties)
+grid_tree_error <- grid_sprout_tree_with_lag(formula, feature_frac, sample_data, minsize, data, penalties)
 
 #get accuracy
 fit_df <- data.frame(seq(1,728))
