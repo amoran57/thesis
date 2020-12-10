@@ -28,7 +28,7 @@ call <- as.formula(call)
 penalties <- seq(0.70, 0.99, by = 0.01)
 
 formula <- call
-feature_frac <- 0.7
+feature_frac <- 1
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd

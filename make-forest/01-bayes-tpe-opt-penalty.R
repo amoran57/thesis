@@ -656,6 +656,11 @@ toc()
 
 bayes_tree <- bayesian_sprout_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
 bayes_tree_fit <- bayes_tree$tree$fit
+bayes_tree_ts <- ts(bayes_tree_fit, start = c(1959, 12), frequency = 12)
+
+grid_tree <- grid_sprout_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
+grid_tree_fit <- grid_tree$grid_tree$fit
+grid_tree_ts <- ts(grid_tree_fit, start = c(1959, 12), frequency = 12)
 
 fit_df <- data.frame(seq(1,729))
 #find fit
@@ -668,7 +673,19 @@ for(i in 1:50) {
 fit_df <- fit_df[-1]
 fit_df$mean <- rowMeans(fit_df)
 bayes_ts <- ts(fit_df$mean, start = c(1959, 12), frequency = 12)
-bayes_tree_ts <- ts(bayes_tree_fit, start = c(1959, 12), frequency = 12)
+
+grid_fit_df <- data.frame(seq(1,729))
+#find fit
+for(i in 1:50) {
+  temp_forest <- grid[[i]]
+  temp_fit <- temp_forest$fit
+  grid_fit_df <- cbind(grid_fit_df, temp_fit)
+}
+
+grid_fit_df <- grid_fit_df[-1]
+grid_fit_df$mean <- rowMeans(grid_fit_df)
+grid_ts <- ts(grid_fit_df$mean, start = c(1959, 12), frequency = 12)
+
 
 y_train <- infl_mbd[,1]
 X_train <- infl_mbd[,-1]
@@ -679,19 +696,15 @@ package_ts <- ts(package_fit, start = c(1959, 12), frequency = 12)
 arima_fit <- auto.arima(tsData)$fitted
 arima_ts <- ts(arima_fit, start = c(1959, 1), frequency = 12)
 
-normal_tree <- reg_tree(formula, infl_mbd, penalty = 0.9)
-normal_tree_ts <- ts(normal_tree$fit, start = c(1959, 12), frequency = 12)
 
-grid_tree <- grid_sprout_tree(formula, 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
-grid_tree_fit <- grid_tree$grid_tree$fit
-grid_tree_ts <- ts(grid_tree_fit, start = c(1959, 12), frequency = 12)
 
 accuracy(tsData, bayes_ts)
+accuracy(tsData, grid_ts)
 accuracy(tsData, bayes_tree_ts)
+accuracy(tsData, grid_tree_ts)
 accuracy(tsData, package_ts)
 accuracy(tsData, arima_ts)
-accuracy(tsData, normal_tree_ts)
-accuracy(tsData, grid_tree_ts)
+
 
 #find bad data -----------------
 for(i in 1:1000){
