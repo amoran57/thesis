@@ -695,8 +695,12 @@ grid_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data =
   return(trees)
 }
 
+tic("Bayes RF")
 bayes_forest_error <- bayes_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
+toc()
+tic("Grid RF")
 grid_forest_error <- grid_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
+toc()
 bayes_tree_error <- bayesian_sprout_tree_with_lag(formula, feature_frac = 1, sample_data, minsize, data, penalties)
 grid_tree_error <- grid_sprout_tree_with_lag(formula, feature_frac = 1, sample_data, minsize, data, penalties)
 
