@@ -28,7 +28,7 @@ call <- as.formula(call)
 penalties <- seq(0.70, 0.99, by = 0.01)
 
 formula <- call
-feature_frac <- 1
+feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
@@ -697,8 +697,8 @@ grid_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data =
 
 bayes_forest_error <- bayes_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
 grid_forest_error <- grid_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
-bayes_tree_error <- bayesian_sprout_tree_with_lag(formula, feature_frac, sample_data, minsize, data, penalties)
-grid_tree_error <- grid_sprout_tree_with_lag(formula, feature_frac, sample_data, minsize, data, penalties)
+bayes_tree_error <- bayesian_sprout_tree_with_lag(formula, feature_frac = 1, sample_data, minsize, data, penalties)
+grid_tree_error <- grid_sprout_tree_with_lag(formula, feature_frac = 1, sample_data, minsize, data, penalties)
 
 #get accuracy
 fit_df <- data.frame(seq(1,728))
