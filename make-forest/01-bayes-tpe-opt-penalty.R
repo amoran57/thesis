@@ -674,7 +674,7 @@ fit_df <- fit_df[-1]
 fit_df$mean <- rowMeans(fit_df)
 bayes_forest_ts <- ts(fit_df$mean, start = c(1959, 12), frequency = 12)
 
-grid_fit_df <- data.frame(seq(1,728))
+grid_fit_df <- data.frame(seq(1,729))
 #find fit
 for(i in 1:50) {
   temp_forest <- grid[[i]]
