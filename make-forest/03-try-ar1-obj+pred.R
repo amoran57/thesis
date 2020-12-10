@@ -582,6 +582,78 @@ evaluate_penalties <- function(these_penalties, l_distribution, g_distribution) 
   
   return(c(best_penalty, next_best_penalty, third_best_penalty))
 }
+grid_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+  # extract features
+  features <- all.vars(formula)[-c(1:2)]
+  # extract target
+  target <- all.vars(formula)[1]
+  #make sure we include first lag
+  first_lag <- all.vars(formula)[2]
+  #add data trend
+  data$trend <- seq(1:nrow(data))
+  # bag the data
+  # - randomly sample the data with replacement (duplicate are possible)
+  if (sample_data == TRUE) {
+    train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
+  } else {
+    train <- data
+  }
+  train <- dplyr::arrange(train, trend)
+  rownames(train) <- seq(1:nrow(train))
+  # randomly sample features
+  # - only fit the regression tree with feature_frac * 100 % of the features
+  features_sample <- sample(features,
+                            size = ceiling(length(features) * feature_frac),
+                            replace = FALSE)
+  # create new formula
+  formula_new <-
+    as.formula(paste0(target, " ~ ", first_lag, " + trend + ", paste0(features_sample,
+                                                                      collapse =  " + ")))
+  # fit the regression tree
+  if(!is.null(penalties)) {
+    # "cross-validate" by testing the tree for each penalty over the most recent four years
+    
+    #get test and training data.frames
+    train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
+    test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
+    rownames(test_df) <- seq(1:nrow(test_df))
+    
+    tic("Grid")
+    #get scores from penalties above
+    rmses <- get_rmses(penalties, formula_new, train_df, test_df, target, lag_name = first_lag)
+    
+    #grab the "best" penalty
+    best_penalty <- penalties[which.min(rmses)]
+    
+    grid_done <- toc()
+    grid_time <- grid_done$toc - grid_done$tic
+    
+    graph_df <- data.frame(rmses, penalties)
+    plot <- ggplot(data = graph_df, aes(x = penalties, y = rmses)) +
+      geom_line() +
+      ylim(min(rmses)/1.2, max(rmses)*1.2)
+    
+    grid_tree <- ar1_reg_tree(formula = formula_new,
+                               data = train,
+                               penalty = best_penalty,
+                               lag_name = first_lag)
+    grid_tree$time <- grid_time
+    
+  } else if (is.null(minsize)) {
+    grid_tree <- ar1_reg_tree(formula = formula_new,
+                         data = train,
+                         minsize = ceiling(nrow(train) * 0.1),
+                         lag_name = first_lag)
+  } else {
+    grid_tree <- ar1_reg_tree(formula = formula_new,
+                         data = train,
+                         minsize = minsize,
+                         lag_name = first_lag)
+  }
+  
+  # return the tree
+  return(list(tree = bayes_tree, penalty_plot = plot))
+}
 bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # extract features
   features <- all.vars(formula)[-c(1:2)]
@@ -721,12 +793,12 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
 }
 
 #forest
-bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+bayes_reg_ar1_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
   trees <- plyr::raply(
     n_trees,
-    bayesian_sprout_tree(
+    bayesian_sprout_ar1_tree(
       formula = formula,
       feature_frac = feature_frac,
       sample_data = sample_data,
@@ -739,12 +811,12 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
   
   return(trees)
 }
-grid_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+grid_reg_ar1_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
   trees <- plyr::raply(
     n_trees,
-    grid_sprout_tree(
+    grid_sprout_ar1_tree(
       formula = formula,
       feature_frac = feature_frac,
       sample_data = sample_data,
@@ -759,17 +831,42 @@ grid_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data =
 }
 
 #Use functions ---------------------------
-normal_tree <- reg_tree(formula, data = infl_mbd, penalty = 0.9)
-ar1_tree <- ar1_reg_tree(formula, data = infl_mbd, penalty = 0.9, lag_name = "tmin1")
+tic("Bayes RF")
+bayes <- bayes_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
+toc()
+tic("Grid RF")
+grid <- grid_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
+toc()
+
 bayes_ar1_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
-normal_tree_fit <- normal_tree$fit
-ar1_tree_fit <- ar1_tree$fit
+grid_ar1_tree <- grid_sprout_ar1_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
+
+#Find fits
+fit_df <- data.frame(seq(1,729))
+for(i in 1:50) {
+  temp_forest <- bayes[[i]]
+  temp_fit <- temp_forest$fit
+  fit_df <- cbind(fit_df, temp_fit)
+}
+fit_df <- fit_df[-1]
+fit_df$mean <- rowMeans(fit_df)
+bayes_forest_ar1_ts <- ts(fit_df$mean, start = c(1959, 12), frequency = 12)
+
+grid_fit_df <- data.frame(seq(1,729))
+for(i in 1:50) {
+  temp_forest <- grid[[i]]
+  temp_fit <- temp_forest$fit
+  grid_fit_df <- cbind(fit_df, temp_fit)
+}
+grid_fit_df <- grid_fit_df[-1]
+grid_fit_df$mean <- rowMeans(grid_fit_df)
+grid_forest_ar1_ts <- ts(grid_fit_df$mean, start = c(1959, 12), frequency = 12)
+
 bayes_ar1_tree_fit <- bayes_ar1_tree$tree$fit
+bayes_tree_ar1_ts <- ts(bayes_ar1_tree_fit, start = c(1959, 12), frequency = 12)
 
-normal_tree_ts <- ts(normal_tree_fit, start = c(1959, 12), frequency = 12)
-ar1_tree_ts <- ts(ar1_tree_fit, start = c(1959, 12), frequency = 12)
-bayes_ar1_tree_ts <- ts(bayes_ar1_tree_fit, start = c(1959, 12), frequency = 12)
-
+grid_ar1_tree_fit <- grid_ar1_tree$tree$fit
+grid_tree_ar1_ts <- ts(grid_ar1_tree_fit, start = c(1959, 12), frequency = 12)
 
 y_train <- infl_mbd[,1]
 X_train <- infl_mbd[,-1]
@@ -781,8 +878,9 @@ arima_fit <- auto.arima(tsData)$fitted
 arima_ts <- ts(arima_fit, start = c(1959, 1), frequency = 12)
 
 #Accuracy ---------------------
-accuracy(tsData, normal_tree_ts)
-accuracy(tsData, ar1_tree_ts)
-accuracy(tsData, bayes_ar1_tree_ts)
+accuracy(tsData, bayes_forest_ar1_ts)
+accuracy(tsData, grid_forest_ar1_ts)
+accuracy(tsData, bayes_tree_ar1_ts)
+accuracy(tsData, grid_tree_ar1_ts)
 accuracy(tsData, package_ts)
 accuracy(tsData, arima_ts)
