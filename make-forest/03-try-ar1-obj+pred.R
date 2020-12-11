@@ -288,7 +288,6 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
   tree_info <- data.frame(NODE = 1, NOBS = nrow(data), FILTER = NA, TERMINAL = "SPLIT",
                           stringsAsFactors = FALSE)
   
-  tic("build tree")
   # keep splitting until there are only leafs left
   while(do_splits) {
     
@@ -400,9 +399,8 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
       do_splits <- !all(tree_info$TERMINAL != "SPLIT")
     } # end for
   } # end while
-  toc()
-  
-  tic("get fits")
+
+
   # calculate fitted values, sorting criteria, and predictions for each criterion
   leafs <- tree_info[tree_info$TERMINAL == "LEAF", ]
   fitted <- c()
@@ -429,180 +427,7 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
   }
   
   pred <- data.frame(criteria, constants, beta_hats)
-  toc()
-  # return everything
-  return(list(tree = tree_info, fit = fitted, formula = formula, data = data, pred = pred, penalty = penalty))
-}
-ar1_reg_tree_no_lag <- function(formula, data, minsize = NULL, penalty = NULL, lag_name) {
-  
-  # coerce to data.frame
-  data <- as.data.frame(data)
-  
-  # handle formula
-  formula <- terms.formula(formula)
-  
-  # get the design matrix
-  X <- model.matrix(formula, data)[,-1]
-  
-  # extract target
-  y_name <- as.character(formula)[2]
-  y <- data[, y_name]
-  
-  # get lag
-  lag <- data[, lag_name]
-  
-  data <- data %>% 
-    dplyr::select(-lag_name)
-  
-  # initialize while loop
-  do_splits <- TRUE
-  
-  # create output data.frame with splitting rules and observations
-  tree_info <- data.frame(NODE = 1, NOBS = nrow(data), FILTER = NA, TERMINAL = "SPLIT",
-                          stringsAsFactors = FALSE)
-  
-  tic("build tree")
-  # keep splitting until there are only leafs left
-  while(do_splits) {
-    
-    # which parents have to be splitted
-    to_calculate <- which(tree_info$TERMINAL == "SPLIT")
-    
-    for (j in to_calculate) {
-      
-      #initiate kill condition
-      keep_going <- TRUE
-      
-      while(keep_going) {   
-        # handle root node
-        if (!is.na(tree_info[j, "FILTER"])) {
-          # subset data according to the filter
-          this_data <- subset(data, eval(parse(text = tree_info[j, "FILTER"])))
-          # get the design matrix
-          X <- model.matrix(formula, this_data)[,-1]
-        } else {
-          this_data <- data
-        }
-        
-        #calculate current SSE
-        this_lm <- lm(this_data[,y_name] ~ this_data[,lag_name])
-        these_residuals <- this_lm$residuals
-        this_ssr <- sum(these_residuals^2)
-        
-        this_y <- this_data[, y_name]
-        this_lag <- this_data[, lag_name]
-        #update kill condition
-        if(this_ssr == 0) {
-          split_here <- rep(FALSE, 2)
-          keep_going <- FALSE
-        }
-        
-        # estimate splitting criteria
-        splitting <- apply(X,  MARGIN = 2, FUN = new_obj_function, y = this_y, lag = this_lag)
-        
-        # get the min SSE
-        tmp_splitter <- which.min(splitting[1,])
-        split_value <- splitting[2,tmp_splitter]
-        split_value <- round(split_value, 9)
-        new_ssr <- splitting[1,tmp_splitter]
-        improvement <- new_ssr/this_ssr
-        
-        # paste filter rules
-        tmp_filter <- c(paste(names(tmp_splitter), ">", 
-                              split_value),
-                        paste(names(tmp_splitter), "<=", 
-                              split_value))
-        
-        # Error handling! check if the splitting rule has already been invoked
-        split_here  <- !sapply(tmp_filter,
-                               FUN = function(x,y) any(grepl(x, x = y)),
-                               y = tree_info$FILTER)
-        
-        if (!is.null(penalty)) {
-          #check for valid split based on minsize or penalty
-          if (is.na(improvement) | improvement > penalty) {
-            split_here <- rep(FALSE, 2)
-            #update kill condition
-            keep_going <- FALSE
-          }
-        }
-        
-        # define maxnode
-        mn <- max(tree_info$NODE)
-        
-        #update kill condition
-        if(keep_going) {
-          keep_going <- ifelse(all(split_here), TRUE, FALSE)
-        }
-        
-        if (!is.na(tree_info[j, "FILTER"])) {
-          # append the splitting rules
-          tmp_filter  <- paste(tree_info[j, "FILTER"], 
-                               tmp_filter, sep = " & ")
-        }
-        
-        # get the number of observations in current node
-        tmp_nobs <- sapply(tmp_filter,
-                           FUN = function(i, x) {
-                             nrow(subset(x = x, subset = eval(parse(text = i))))
-                           },
-                           x = this_data)
-        
-        if(any(tmp_nobs < 2)) {
-          split_here <- rep(FALSE, 2)
-        }
-        #end while loop
-        keep_going <- FALSE
-      }
-      
-      
-      # create children data frame
-      children <- data.frame(NODE = c(mn+1, mn+2),
-                             NOBS = tmp_nobs,
-                             FILTER = tmp_filter,
-                             TERMINAL = c(ifelse(tmp_nobs[1] > 1, "SPLIT", "LEAF"), ifelse(tmp_nobs[2] > 1, "SPLIT", "LEAF")),
-                             row.names = NULL)[split_here,]
-      
-      # overwrite state of current node
-      tree_info[j, "TERMINAL"] <- ifelse(all(!split_here), "LEAF", "PARENT")
-      
-      # bind everything
-      tree_info <- rbind(tree_info, children)
-      
-      # check if there are any open splits left
-      do_splits <- !all(tree_info$TERMINAL != "SPLIT")
-    } # end for
-  } # end while
-  toc()
-  
-  tic("get fits")
-  # calculate fitted values, sorting criteria, and predictions for each criterion
-  leafs <- tree_info[tree_info$TERMINAL == "LEAF", ]
-  fitted <- c()
-  criteria <- c()
-  constants <- c()
-  beta_hats <- c()
-  for (i in seq_len(nrow(leafs))) {
-    criterion <- leafs[i, "FILTER"]
-    # extract index
-    if(!is.na(criterion)) {
-      ind <- as.numeric(rownames(subset(data, eval(parse(text = criterion)))))
-    } else {
-      ind <- as.numeric(rownames(data))
-    }
-    
-    # estimator is the fitted AR(1) value of the leaf 
-    this_leaf_lm <- lm(y[ind] ~ lag[ind])
-    this_leaf_fit <- this_leaf_lm$fitted
-    
-    fitted[ind] <- this_leaf_fit
-    constants[i] <- this_leaf_lm$coefficients[1]
-    beta_hats[i] <- this_leaf_lm$coefficients[2]
-    criteria[i] <- criterion
-  }
-  
-  pred <- data.frame(criteria, constants, beta_hats)
-  toc()
+
   # return everything
   return(list(tree = tree_info, fit = fitted, formula = formula, data = data, pred = pred, penalty = penalty))
 }
@@ -1057,3 +882,32 @@ accuracy(tsData, bayes_tree_ar1_ts)
 accuracy(tsData, grid_tree_ar1_ts)
 accuracy(tsData, package_ts)
 accuracy(tsData, arima_ts)
+
+#Bootleg ------------------------
+grid <- list()
+for(i in 1:50) {
+  formula <- call
+  feature_frac <- 0.7
+  data <- infl_mbd
+  
+  # extract features
+  features <- all.vars(formula)[-c(1:2)]
+  # extract target
+  target <- all.vars(formula)[1]
+  #make sure we include first lag
+  first_lag <- all.vars(formula)[2]
+  #add data trend
+  data$trend <- seq(1:nrow(data))
+
+  # randomly sample features
+  # - only fit the regression tree with feature_frac * 100 % of the features
+  features_sample <- sample(features,
+                            size = ceiling(length(features) * feature_frac),
+                            replace = FALSE)
+  # create new formula
+  formula_new <-
+    as.formula(paste0(target, " ~ ", first_lag, " + trend + ", paste0(features_sample,
+                                                                      collapse =  " + ")))
+  tree <- grid_sprout_ar1_tree(formula_new, feature_frac, sample_data = FALSE, data = data, penalties = penalties)
+  grid[[i]] <- tree
+}
