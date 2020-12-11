@@ -640,8 +640,6 @@ tic("Grid RF")
 grid <- grid_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
 toc()
 
-tree <- ar1_reg_tree(formula, infl_mbd, penalty = 0.9, lag_name = "tmin1")
-
 bayes_ar1_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
 grid_ar1_tree <- grid_sprout_ar1_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
 
@@ -654,7 +652,7 @@ for(i in 1:50) {
 }
 fit_df <- fit_df[-1]
 fit_df$mean <- rowMeans(fit_df)
-bayes_forest_ar1_ts <- ts(fit_df$mean, start = c(1959, 12), frequency = 12)
+bayes_forest_ar1_pred_ts <- ts(fit_df$mean, start = c(1959, 12), frequency = 12)
 
 grid_fit_df <- data.frame(seq(1,729))
 for(i in 1:50) {
@@ -664,13 +662,13 @@ for(i in 1:50) {
 }
 grid_fit_df <- grid_fit_df[-1]
 grid_fit_df$mean <- rowMeans(grid_fit_df)
-grid_forest_ar1_ts <- ts(grid_fit_df$mean, start = c(1959, 12), frequency = 12)
+grid_forest_ar1_pred_ts <- ts(grid_fit_df$mean, start = c(1959, 12), frequency = 12)
 
 bayes_ar1_tree_fit <- bayes_ar1_tree$tree$fit
-bayes_tree_ar1_ts <- ts(bayes_ar1_tree_fit, start = c(1959, 12), frequency = 12)
+bayes_tree_ar1_pred_ts <- ts(bayes_ar1_tree_fit, start = c(1959, 12), frequency = 12)
 
 grid_ar1_tree_fit <- grid_ar1_tree$tree$fit
-grid_tree_ar1_ts <- ts(grid_ar1_tree_fit, start = c(1959, 12), frequency = 12)
+grid_tree_ar1_pred_ts <- ts(grid_ar1_tree_fit, start = c(1959, 12), frequency = 12)
 
 y_train <- infl_mbd[,1]
 X_train <- infl_mbd[,-1]
@@ -682,9 +680,9 @@ arima_fit <- auto.arima(tsData)$fitted
 arima_ts <- ts(arima_fit, start = c(1959, 1), frequency = 12)
 
 #Accuracy ---------------------
-accuracy(tsData, bayes_forest_ar1_ts)
-accuracy(tsData, grid_forest_ar1_ts)
-accuracy(tsData, bayes_tree_ar1_ts)
-accuracy(tsData, grid_tree_ar1_ts)
+accuracy(tsData, bayes_forest_ar1_pred_ts)
+accuracy(tsData, grid_forest_ar1_pred_ts)
+accuracy(tsData, bayes_tree_ar1_pred_ts)
+accuracy(tsData, grid_tree_ar1_pred_ts)
 accuracy(tsData, package_ts)
 accuracy(tsData, arima_ts)
