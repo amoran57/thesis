@@ -567,7 +567,7 @@ get_prediction <- function(forest, X_test) {
 }
 
 #Predict using random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
 
@@ -600,4 +600,17 @@ for (monthx in monthly_dates) {
 toc()
 
 forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
+
+pred_arima <- c()
+for (monthx in monthly_dates) {
+  #initialize training data according to expanding horizon
+  train_df <- values_df %>% 
+    filter(date <= monthx)
+  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
+  
+  pred_a <- forecast(auto.arima(train_tsData), 1)$mean
+  
+  pred_arima <- c(pred_arima, pred_a)
+}
+
 accuracy(tsData, forecast_ts)
