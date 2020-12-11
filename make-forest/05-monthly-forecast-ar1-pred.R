@@ -599,7 +599,50 @@ for (monthx in monthly_dates) {
 }
 toc()
 
-forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
+forecasts_tree <- c()
+tic("expanding horizon tree")
+for (monthx in monthly_dates) {
+  #initialize training data according to expanding horizon
+  train_df <- values_df %>% 
+    dplyr::filter(date <= monthx)
+  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
+  
+  infl_mbd <- embed(train_tsData, lag_order)
+  infl_mbd <- as.data.frame(infl_mbd)
+  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  
+  #set training and test sets
+  X_test <- infl_mbd[nrow(infl_mbd), ]
+  X_test$trend <- nrow(infl_mbd)
+  infl_mbd <- infl_mbd[-nrow(infl_mbd),]
+  
+  #fit the forest
+  bayes_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = sample_data, data = infl_mbd, penalties = penalties)
+  
+  tree_pred <- bayes_tree$tree$pred
+  tree_pred$criteria <- as.character(tree_pred$criteria)
+  
+  #get appropriate row from tree_info
+  tf <- c()
+  for(j in 1:nrow(tree_pred)) {
+    f <- eval(parse(text = tree_pred$criteria[j]), envir = X_test)
+    tf <- c(tf, f)
+  }
+  
+  #get constant and beta_hat and predict
+  temp_pred <- tree_pred[tf,]
+  this_constant <- temp_pred$constants
+  this_beta_hat <- temp_pred$beta_hats
+  this_lag <- X_test$tmin1
+  this_prediction <- this_constant + this_beta_hat*this_lag
+
+  
+  forecasts_tree <- c(forecasts_tree, this_prediction)
+}
+toc()
+
+forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
+tree_forecast_ts <- ts(forecasts_tree, start = c(1999, 1), frequency = 12)
 
 pred_arima <- c()
 for (monthx in monthly_dates) {
@@ -613,7 +656,8 @@ for (monthx in monthly_dates) {
   pred_arima <- c(pred_arima, pred_a)
 }
 
-accuracy(tsData, forecast_ts)
+accuracy(tsData, forest_forecast_ts)
+accuracy(tsData, tree_forecast_ts)
 accuracy(tsData, pred_arima)
 
 write_rds(forecast_ts, paste0(export,"4_year_ar1_forecast.rds"))
