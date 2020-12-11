@@ -614,3 +614,6 @@ for (monthx in monthly_dates) {
 }
 
 accuracy(tsData, forecast_ts)
+accuracy(tsData, pred_arima)
+
+write_rds(forecast_ts, paste0(export,"4_year_ar1_forecast.rds"))
