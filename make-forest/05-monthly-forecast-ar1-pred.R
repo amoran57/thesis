@@ -547,3 +547,64 @@ tic("Bayes RF")
 bayes <- bayes_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
 toc()
 
+#random forest method --------------------------------------
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
+lag_order <- 12
+forecasts_rf
+
+tic("expanding horizon forest")
+for (monthx in monthly_dates) {
+  #initialize training data according to expanding horizon
+  train_df <- values_df %>% 
+    dplyr::filter(date <= monthx)
+  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
+  
+  infl_mbd <- embed(train_tsData, lag_order)
+  infl_mbd <- as.data.frame(infl_mbd)
+  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  
+  #set training and test sets
+  X_test <- infl_mbd[nrow(infl_mbd), ]
+  X_test$trend <- nrow(infl_mbd)
+  infl_mbd <- infl_mbd[-nrow(infl_mbd),]
+ 
+  #fit the forest
+  bayes <- bayes_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
+  
+  #get the prediction
+  predict_rf <- get_prediction(forest = bayes, X_test = X_test)
+  
+  forecasts_rf <- c(forecasts_rf, predict_rf)
+}
+toc()
+
+
+
+get_prediction <- function(forest, X_test) {
+  num_trees <- length(forest)/2
+  this_lag <- X_test$tmin1
+  all_predictions <- c()
+  
+  for (i in 1:num_trees) {
+    #get each tree from the forest
+    temp_tree <- forest[[i]]
+    temp_tree_pred <- temp_tree$pred
+    temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
+    
+    #get appropriate row from tree_info
+    tf <- c()
+    for(j in 1:nrow(temp_tree_pred)) {
+      f <- eval(parse(text = temp_tree_pred$criteria[j]), envir = X_test)
+      tf <- c(tf, f)
+    }
+    
+    #get constant and beta_hat and predict
+    temp_pred <- temp_tree_pred[tf,]
+    this_constant <- temp_pred$constants
+    this_beta_hat <- temp_pred$beta_hats
+    all_predictions[i] <- this_constant + this_beta_hat*this_lag
+  }
+  #get the forest prediction and return it
+  forest_prediction <- mean(all_predictions)
+  return(forest_prediction)
+}
