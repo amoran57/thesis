@@ -454,7 +454,7 @@ grid_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, mins
   }
   
   # return the tree
-  return(list(tree = bayes_tree, penalty_plot = plot))
+  return(list(tree = grid_tree, penalty_plot = plot))
 }
 bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # extract features
@@ -639,6 +639,8 @@ toc()
 tic("Grid RF")
 grid <- grid_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
 toc()
+
+tree <- ar1_reg_tree(formula, infl_mbd, penalty = 0.9, lag_name = "tmin1")
 
 bayes_ar1_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
 grid_ar1_tree <- grid_sprout_ar1_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
