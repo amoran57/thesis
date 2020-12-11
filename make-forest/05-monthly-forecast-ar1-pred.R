@@ -384,6 +384,8 @@ evaluate_penalties <- function(these_penalties, l_distribution, g_distribution) 
   
   return(c(best_penalty, next_best_penalty, third_best_penalty))
 }
+
+#forest
 bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # extract features
   features <- all.vars(formula)[-c(1:2)]
@@ -419,8 +421,6 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
     train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
     test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
     rownames(test_df) <- seq(1:nrow(test_df))
-    
-    tic("Bayes")
     
     min_penalty <- min(penalties)
     max_penalty <- max(penalties)
@@ -494,9 +494,6 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
     best_penalties <- evaluate_penalties(penalties, l_distribution, g_distribution)
     best_penalty <- best_penalties[1]
     
-    bayes_done <- toc()
-    bayes_time <- bayes_done$toc - bayes_done$tic
-    
     l_plot <- ggplot(data = l_distribution, aes(x = penalties, y = mean)) +
       geom_point()
     
@@ -504,7 +501,6 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
                                data = train,
                                penalty = best_penalty,
                                lag_name = first_lag)
-    bayes_tree$time <- bayes_time
     
   } else if (is.null(minsize)) {
     tree <- ar1_reg_tree(formula = formula_new,
@@ -521,8 +517,6 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
   # return the tree
   return(list(tree = bayes_tree, l_plot = l_plot))
 }
-
-#forest
 bayes_reg_ar1_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
@@ -542,44 +536,7 @@ bayes_reg_ar1_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_d
   return(trees)
 }
 
-#Use functions ---------------------------
-tic("Bayes RF")
-bayes <- bayes_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
-toc()
-
-#random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
-lag_order <- 12
-forecasts_rf
-
-tic("expanding horizon forest")
-for (monthx in monthly_dates) {
-  #initialize training data according to expanding horizon
-  train_df <- values_df %>% 
-    dplyr::filter(date <= monthx)
-  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
-  
-  infl_mbd <- embed(train_tsData, lag_order)
-  infl_mbd <- as.data.frame(infl_mbd)
-  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
-  
-  #set training and test sets
-  X_test <- infl_mbd[nrow(infl_mbd), ]
-  X_test$trend <- nrow(infl_mbd)
-  infl_mbd <- infl_mbd[-nrow(infl_mbd),]
- 
-  #fit the forest
-  bayes <- bayes_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
-  
-  #get the prediction
-  predict_rf <- get_prediction(forest = bayes, X_test = X_test)
-  
-  forecasts_rf <- c(forecasts_rf, predict_rf)
-}
-toc()
-
-
-
+#prediction
 get_prediction <- function(forest, X_test) {
   num_trees <- length(forest)/2
   this_lag <- X_test$tmin1
@@ -608,3 +565,39 @@ get_prediction <- function(forest, X_test) {
   forest_prediction <- mean(all_predictions)
   return(forest_prediction)
 }
+
+#Predict using random forest method --------------------------------------
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
+lag_order <- 12
+forecasts_rf <- c()
+
+tic("expanding horizon forest")
+for (monthx in monthly_dates) {
+  #initialize training data according to expanding horizon
+  train_df <- values_df %>% 
+    dplyr::filter(date <= monthx)
+  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
+  
+  infl_mbd <- embed(train_tsData, lag_order)
+  infl_mbd <- as.data.frame(infl_mbd)
+  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  
+  #set training and test sets
+  X_test <- infl_mbd[nrow(infl_mbd), ]
+  X_test$trend <- nrow(infl_mbd)
+  infl_mbd <- infl_mbd[-nrow(infl_mbd),]
+ 
+  #fit the forest
+  tic("Bayesian forest")
+  bayes <- bayes_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
+  toc()
+  
+  #get the prediction
+  predict_rf <- get_prediction(forest = bayes, X_test = X_test)
+  
+  forecasts_rf <- c(forecasts_rf, predict_rf)
+}
+toc()
+
+forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
+accuracy(tsData, forecast_ts)
