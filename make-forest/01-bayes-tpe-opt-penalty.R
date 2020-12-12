@@ -611,8 +611,10 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
   # - track the progress with a progress bar
 
   split <- detectCores()/2
+  print(paste0("Cores to use: ", as.character(split)))
   tic("Parallel")
   if(n_trees < split) {
+    print("Will only run once")
     #reduce split and run only once
     split <- n_trees
     cl <- makeCluster(split)
@@ -641,6 +643,7 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
     stopCluster(cl)
   } else {
     iterate <- ceiling(n_trees/split)
+    print(paste0("Will run ", as.character(iterate), " times"))
     trees <- list()
     cl <- makeCluster(split)
     registerDoParallel(cl)
