@@ -32,6 +32,8 @@ feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
+x <- c("dplyr", "tictoc", "ggplot2")
+n_trees <- 50
 # Functions ------------------------------------------------
 
 #foundational
@@ -662,7 +664,7 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
   
-  split <- detectCores()/2
+  split <- ceiling(detectCores()/1.2)
   print(paste0("Cores to use: ", as.character(split)))
   tic("Parallel")
   if(n_trees < split) {
@@ -775,7 +777,7 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
 
 
 tic("Bayes RF")
-bayes_forest_error <- bayes_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
+bayes_forest_error <- bayes_reg_parallel_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
 toc()
 tic("Grid RF")
 grid_forest_error <- grid_reg_rf(formula, 50, feature_frac, sample_data, minsize, data, penalties)
