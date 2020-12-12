@@ -658,7 +658,7 @@ grid_sprout_tree_with_lag <- function(formula, feature_frac, sample_data = FALSE
 
 
 #forest
-bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
   
@@ -737,6 +737,24 @@ grid_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data =
   trees <- plyr::raply(
     n_trees,
     grid_sprout_tree_with_lag(
+      formula = formula,
+      feature_frac = feature_frac,
+      sample_data = sample_data,
+      minsize = minsize,
+      data = data,
+      penalties = penalties
+    ),
+    .progress = "text"
+  )
+  
+  return(trees)
+}
+bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+  # apply the rf_tree function n_trees times with plyr::raply
+  # - track the progress with a progress bar
+  trees <- plyr::raply(
+    n_trees,
+    bayes_sprout_tree_with_lag(
       formula = formula,
       feature_frac = feature_frac,
       sample_data = sample_data,

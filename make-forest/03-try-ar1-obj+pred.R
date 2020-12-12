@@ -843,7 +843,7 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
     registerDoParallel(cl)
     x <- c("dplyr", "tictoc", "ggplot2")
     clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
-                        "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", 
+                        "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties", 
                         "generate_custom_random", "get_distribution", "new_obj_function",
                         "split_lg", "get_rmses", "ar1_reg_tree", "reg_tree", "sse_var"))
     init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
@@ -871,7 +871,7 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
     registerDoParallel(cl)
     x <- c("dplyr", "tictoc", "ggplot2")
     clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
-                        "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", 
+                        "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties",
                         "generate_custom_random", "get_distribution", "new_obj_function",
                         "split_lg", "get_rmses", "ar1_reg_tree", "reg_tree", "sse_var"))
     init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))

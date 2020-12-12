@@ -535,6 +535,80 @@ bayes_reg_ar1_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_d
   
   return(trees)
 }
+bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+  # apply the rf_tree function n_trees times with plyr::raply
+  # - track the progress with a progress bar
+  
+  split <- detectCores()/2
+  print(paste0("Cores to use: ", as.character(split)))
+  tic("Parallel")
+  if(n_trees < split) {
+    print("Will only run once")
+    #reduce split and run only once
+    split <- n_trees
+    cl <- makeCluster(split)
+    registerDoParallel(cl)
+    x <- c("dplyr", "tictoc", "ggplot2")
+    clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
+                        "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties", 
+                        "generate_custom_random", "get_distribution",
+                        "split_lg", "get_rmses", "ar1_reg_tree", "sse_var"))
+    init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
+    
+    trees <- foreach(
+      rep(1, split),
+      .combine = list,
+      .multicombine = TRUE) %dopar%
+      bayesian_sprout_ar1_tree(
+        formula = formula,
+        feature_frac = feature_frac,
+        sample_data = sample_data,
+        minsize = minsize,
+        data = data,
+        penalties = penalties
+      )
+    
+    
+    stopCluster(cl)
+  } else {
+    iterate <- ceiling(n_trees/split)
+    print(paste0("Will run ", as.character(iterate), " times"))
+    trees <- list()
+    cl <- makeCluster(split)
+    registerDoParallel(cl)
+    x <- c("dplyr", "tictoc", "ggplot2")
+    clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
+                        "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties",
+                        "generate_custom_random", "get_distribution", 
+                        "split_lg", "get_rmses", "ar1_reg_tree", "sse_var"))
+    init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
+    
+    for(i in 1:iterate) {
+      tic(paste0("batch ", as.character(i), " of ", as.character(iterate), " complete"))
+      these_trees <- foreach(
+        rep(1, split),
+        .combine = list,
+        .multicombine = TRUE) %dopar%
+        bayesian_sprout_ar1_tree(
+          formula = formula,
+          feature_frac = feature_frac,
+          sample_data = sample_data,
+          minsize = minsize,
+          data = data,
+          penalties = penalties
+        )
+      
+      trees <- c(trees, these_trees)
+      toc()
+    }
+    
+    stopCluster(cl)
+    
+  }
+  toc()
+  stopClreturn(trees)
+}
+
 
 #prediction
 get_prediction <- function(forest, X_test) {
