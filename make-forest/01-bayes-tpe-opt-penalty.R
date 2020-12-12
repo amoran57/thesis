@@ -652,6 +652,7 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
     init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
     
     for(i in 1:iterate) {
+      tic(paste0("batch"," ", as.character(i)))
       these_trees <- foreach(
         rep(1, split),
         .combine = list,
@@ -666,6 +667,7 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
         )
       
       trees <- c(trees, these_trees)
+      toc()
     }
     
     stopCluster(cl)
