@@ -650,7 +650,7 @@ grid_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, mins
   }
   
   # return the tree
-  return(list(tree = bayes_tree, penalty_plot = plot))
+  return(list(tree = grid_tree, penalty_plot = plot))
 }
 bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # extract features
@@ -854,7 +854,7 @@ grid_fit_df <- data.frame(seq(1,729))
 for(i in 1:50) {
   temp_forest <- grid[[i]]
   temp_fit <- temp_forest$fit
-  grid_fit_df <- cbind(fit_df, temp_fit)
+  grid_fit_df <- cbind(grid_fit_df, temp_fit)
 }
 grid_fit_df <- grid_fit_df[-1]
 grid_fit_df$mean <- rowMeans(grid_fit_df)
@@ -911,3 +911,7 @@ for(i in 1:50) {
   tree <- grid_sprout_ar1_tree(formula_new, feature_frac, sample_data = FALSE, data = data, penalties = penalties)
   grid[[i]] <- tree
 }
+
+
+#export ----------------------
+write_rds(grid_forest_ar1_ts, paste0(export,"grid_forest_ar1_pred.rds"))
