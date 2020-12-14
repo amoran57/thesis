@@ -538,6 +538,13 @@ bayes_reg_ar1_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_d
 bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
+  formula <- formula
+  n_trees <- n_trees
+  feature_frac <- feature_frac
+  sample_data <- sample_data
+  minsize <- minsize
+  data <- data
+  penalties <- penalties
   
   split <- detectCores()/2
   print(paste0("Cores to use: ", as.character(split)))
