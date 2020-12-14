@@ -653,6 +653,51 @@ monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
 
+#get a list of all 241 complete horizons
+all_months <- lapply(monthly_dates, function(x) {
+  train_df <- values_df %>% 
+    dplyr::filter(date <= x)
+  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
+  return(train_tsData)
+})
+
+all_predictions <- plyr::laply(all_months, function(x) {
+  infl_mbd <- embed(x, lag_order)
+  infl_mbd <- as.data.frame(infl_mbd)
+  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  
+  #set training and test sets
+  X_test <- infl_mbd[nrow(infl_mbd), ]
+  X_test$trend <- nrow(infl_mbd)
+  infl_mbd <- infl_mbd[-nrow(infl_mbd),]
+  
+  #fit the forest
+  bayes <- ar1_reg_tree(formula, data = infl_mbd, penalty = 0.9, lag_name = "tmin1")
+
+  tree_pred <- bayes$pred
+  tree_pred$criteria <- as.character(tree_pred$criteria)
+  
+  #get appropriate row from tree_info
+  tf <- c()
+  for(j in 1:nrow(tree_pred)) {
+    f <- eval(parse(text = tree_pred$criteria[j]), envir = X_test)
+    tf <- c(tf, f)
+  }
+  
+  #get constant and beta_hat and predict
+  temp_pred <- tree_pred[tf,]
+  this_constant <- temp_pred$constants
+  this_beta_hat <- temp_pred$beta_hats
+  this_lag <- X_test$tmin1
+  this_prediction <- this_constant + this_beta_hat*this_lag
+  # #get the prediction
+  # predict_rf <- get_prediction(forest = bayes, X_test = X_test)
+  # 
+  return(this_prediction)
+},
+.progress = "text"
+)
+
 tic("expanding horizon forest")
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
@@ -681,50 +726,75 @@ for (monthx in monthly_dates) {
 }
 toc()
 
-forecasts_tree <- c()
-tic("expanding horizon tree")
-for (monthx in monthly_dates) {
-  #initialize training data according to expanding horizon
-  train_df <- values_df %>% 
-    dplyr::filter(date <= monthx)
-  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
-  
-  infl_mbd <- embed(train_tsData, lag_order)
-  infl_mbd <- as.data.frame(infl_mbd)
-  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
-  
-  #set training and test sets
-  X_test <- infl_mbd[nrow(infl_mbd), ]
-  X_test$trend <- nrow(infl_mbd)
-  infl_mbd <- infl_mbd[-nrow(infl_mbd),]
-  
-  #fit the tree
-  bayes_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = sample_data, data = infl_mbd, penalties = penalties)
-  
-  tree_pred <- bayes_tree$tree$pred
-  tree_pred$criteria <- as.character(tree_pred$criteria)
-  
-  #get appropriate row from tree_info
-  tf <- c()
-  for(j in 1:nrow(tree_pred)) {
-    f <- eval(parse(text = tree_pred$criteria[j]), envir = X_test)
-    tf <- c(tf, f)
-  }
-  
-  #get constant and beta_hat and predict
-  temp_pred <- tree_pred[tf,]
-  this_constant <- temp_pred$constants
-  this_beta_hat <- temp_pred$beta_hats
-  this_lag <- X_test$tmin1
-  this_prediction <- this_constant + this_beta_hat*this_lag
 
+tree_predictions <- c()
+local_all_months <- all_months
+split <- ceiling(detectCores()/1.2) - 1
+iterations <- floor(length(all_months)/split)
+get_parallel_predictions_tree <- function(these_months, split) {
+  cl <- makeCluster(split)
+  registerDoParallel(cl)
+  x <- c("dplyr", "tictoc", "ggplot2")
+  clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
+                      "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties", 
+                      "generate_custom_random", "get_distribution",
+                      "split_lg", "get_rmses", "ar1_reg_tree", "sse_var"))
+  init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
   
-  forecasts_tree <- c(forecasts_tree, this_prediction)
+  these_predictions <- foreach(
+    these_months,
+    .combine = list,
+    .multicombine = TRUE) %dopar%
+    function(x) {
+      infl_mbd <- embed(x, lag_order)
+      infl_mbd <- as.data.frame(infl_mbd)
+      names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+      
+      #set training and test sets
+      X_test <- infl_mbd[nrow(infl_mbd), ]
+      X_test$trend <- nrow(infl_mbd)
+      infl_mbd <- infl_mbd[-nrow(infl_mbd),]
+      bayes_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = infl_mbd, data = infl_mbd, penalties = penalties)
+      
+      tree_pred <- bayes_tree$tree$pred
+      tree_pred$criteria <- as.character(tree_pred$criteria)
+      
+      #get appropriate row from tree_info
+      tf <- c()
+      for(j in 1:nrow(tree_pred)) {
+        f <- eval(parse(text = tree_pred$criteria[j]), envir = X_test)
+        tf <- c(tf, f)
+      }
+      
+      #get constant and beta_hat and predict
+      temp_pred <- tree_pred[tf,]
+      this_constant <- temp_pred$constants
+      this_beta_hat <- temp_pred$beta_hats
+      this_lag <- X_test$tmin1
+      this_prediction <- this_constant + this_beta_hat*this_lag
+      
+      return(this_prediction)
+    }
+  
+  stopCluster(cl)
+  
+  return(these_predictions)
 }
-toc()
+for(i in 1:(iterations - 1)) {
+  these_months <- local_all_months[[1:split]]
+  local_all_months <- local_all_months[[-c(1:split)]]
+  
+  these_predictions <- get_parallel_predictions_tree(these_months, split)
+  
+  tree_predictions <- c(tree_predictions, these_predictions)
+}
+split <- length(local_all_months)
+these_predictions <- get_parallel_predictions_tree(local_all_months, split)
+tree_predictions <- c(tree_predictions, these_predictions)
+
 
 forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
-tree_forecast_ts <- ts(forecasts_tree, start = c(1999, 1), frequency = 12)
+tree_forecast_ts <- ts(tree_predictions, start = c(1999, 1), frequency = 12)
 
 pred_arima <- c()
 for (monthx in monthly_dates) {
