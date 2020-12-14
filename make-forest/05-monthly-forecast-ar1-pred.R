@@ -33,7 +33,8 @@ feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd[sample(1:nrow(infl_mbd), size = nrow(infl_mbd), replace = TRUE),]
-
+x <- c("dplyr", "tictoc", "ggplot2")
+n_trees <- 0
 #Functions ----------------------------------------------
 #foundational
 sse_var <- function(x, y) {
@@ -546,7 +547,7 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   data <- data
   penalties <- penalties
   
-  split <- detectCores()/2
+  split <- ceiling(detectCores()/1.2) - 1
   print(paste0("Cores to use: ", as.character(split)))
   tic("Parallel")
   if(n_trees < split) {
@@ -613,20 +614,20 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
     
   }
   toc()
-  stopClreturn(trees)
+  return(trees)
 }
 
 
 #prediction
 get_prediction <- function(forest, X_test) {
-  num_trees <- length(forest)/2
+  num_trees <- length(forest)
   this_lag <- X_test$tmin1
   all_predictions <- c()
   
   for (i in 1:num_trees) {
     #get each tree from the forest
     temp_tree <- forest[[i]]
-    temp_tree_pred <- temp_tree$pred
+    temp_tree_pred <- temp_tree$tree$pred
     temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
     
     #get appropriate row from tree_info
@@ -648,7 +649,7 @@ get_prediction <- function(forest, X_test) {
 }
 
 #Predict using random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
 
@@ -670,7 +671,7 @@ for (monthx in monthly_dates) {
  
   #fit the forest
   tic("Bayesian forest")
-  bayes <- bayes_reg_ar1_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
+  bayes <- bayes_reg_parallel_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
   toc()
   
   #get the prediction
@@ -697,7 +698,7 @@ for (monthx in monthly_dates) {
   X_test$trend <- nrow(infl_mbd)
   infl_mbd <- infl_mbd[-nrow(infl_mbd),]
   
-  #fit the forest
+  #fit the tree
   bayes_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = sample_data, data = infl_mbd, penalties = penalties)
   
   tree_pred <- bayes_tree$tree$pred
