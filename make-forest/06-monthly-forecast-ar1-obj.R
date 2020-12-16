@@ -33,7 +33,7 @@ feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
-n_trees <- 50
+n_trees <- 10
 
 #Functions ----------------------------------------------
 #foundational
@@ -499,7 +499,7 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
     
     #grab the "best" penalty
     best_penalties <- evaluate_penalties(penalties, l_distribution, g_distribution)
-    best_penalty <- best_penalties[1]
+    best_penalty <- history$penalties[which.min(history$score)]
     
     bayes_done <- toc()
     bayes_time <- bayes_done$toc - bayes_done$tic
@@ -544,7 +544,7 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   split <- detectCores()/1.2
   print(paste0("Cores to use: ", as.character(split)))
   tic("Parallel")
-  if(n_trees < split) {
+  if(n_trees <= split) {
     print("Will only run once")
     #reduce split and run only once
     split <- n_trees
