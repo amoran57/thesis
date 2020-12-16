@@ -611,6 +611,8 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   return(trees)
 }
 
+results <- lapply(trees, function(x) answer <- nrow(x$tree$pred))
+
 #prediction
 get_prediction <- function(forest, X_test) {
   num_trees <- length(forest)
