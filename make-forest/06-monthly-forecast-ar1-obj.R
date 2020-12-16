@@ -33,42 +33,45 @@ feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd[sample(1:nrow(infl_mbd), size = nrow(infl_mbd), replace = TRUE),]
-x <- c("dplyr", "tictoc", "ggplot2")
-n_trees <- 0
+
 #Functions ----------------------------------------------
 #foundational
-sse_var <- function(x, y) {
-  this_df <- data.frame(x,y) %>% 
+new_obj_function <- function(x, y, lag) {
+  this_df <- data.frame(x, y, lag) %>% 
     dplyr::arrange(x)
   
   y <- this_df$y
-  y_length <- length(y)
+  lag <- this_df$lag
+  x <- this_df$x
   
-  sse <- c()
+  splits <- unique(x)
+  ssr <- c()
   
-  #initialize values
-  first_node <- c()
-  first_mean <- 0
-  first_sse <- 0
-  second_node <- y
-  second_mean <- mean(second_node)
-  second_sse <- sum((second_node - second_mean)^2)
-  
-  for (i in 1:length(y)) {
-    y_new <- y[i]
+  for(i in seq_along(splits)) {
+    sp <- splits[i]
     
-    #update values
-    first_node <- c(first_node, y_new)
-    first_mean <- (first_mean*(i - 1) + y_new)/i
-    first_sse <- sum((first_node - first_mean)^2)
-    second_node <- second_node[-1]
-    second_mean <- (second_mean*(y_length - i + 1) - y_new)/(y_length - i)
-    second_sse <- sum((second_node - second_mean)^2)
-    sse[i] <- first_sse + second_sse
+    first_y <- y[x < sp]
+    first_lag <- lag[x < sp]
+    second_y <- y[x >= sp]
+    second_lag <- lag[x >= sp]
+    
+    if(length(first_y) > 0) {
+      first_reg <- lm(first_y ~ first_lag)
+      first_residuals <- first_reg$residuals
+      first_ssr <- sum(first_residuals^2)
+    } else {
+      first_ssr <- 0
+    }
+    
+    second_reg <- lm(second_y ~ second_lag)
+    second_residuals <- second_reg$residuals
+    second_ssr <- sum(second_residuals^2)
+    
+    ssr[i] <- first_ssr + second_ssr
   }
   
-  split_at <- this_df[which.min(sse),]$x
-  return(c(sse = min(sse), split = split_at))
+  split_at <- splits[which.min(ssr)]
+  return(c(ssr = min(ssr), split = split_at))
 }
 ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name) {
   
@@ -95,7 +98,6 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
   tree_info <- data.frame(NODE = 1, NOBS = nrow(data), FILTER = NA, TERMINAL = "SPLIT",
                           stringsAsFactors = FALSE)
   
-  
   # keep splitting until there are only leafs left
   while(do_splits) {
     
@@ -119,26 +121,27 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
         }
         
         #calculate current SSE
+        this_lm <- lm(this_data[,y_name] ~ this_data[,lag_name])
+        these_residuals <- this_lm$residuals
+        this_ssr <- sum(these_residuals^2)
+        
         this_y <- this_data[, y_name]
         this_lag <- this_data[, lag_name]
-        mean_this_y <- mean(this_y)
-        this_sse <- sum((this_y - mean_this_y)^2)
-        
         #update kill condition
-        if(this_sse == 0) {
+        if(this_ssr == 0) {
           split_here <- rep(FALSE, 2)
           keep_going <- FALSE
         }
         
         # estimate splitting criteria
-        splitting <- apply(X,  MARGIN = 2, FUN = sse_var, y = this_y)
+        splitting <- apply(X,  MARGIN = 2, FUN = new_obj_function, y = this_y, lag = this_lag)
         
         # get the min SSE
         tmp_splitter <- which.min(splitting[1,])
         split_value <- splitting[2,tmp_splitter]
         split_value <- round(split_value, 9)
-        new_sse <- splitting[1,tmp_splitter]
-        improvement <- new_sse/this_sse
+        new_ssr <- splitting[1,tmp_splitter]
+        improvement <- new_ssr/this_ssr
         
         # paste filter rules
         tmp_filter <- c(paste(names(tmp_splitter), ">", 
@@ -207,6 +210,7 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
     } # end for
   } # end while
   
+  
   # calculate fitted values, sorting criteria, and predictions for each criterion
   leafs <- tree_info[tree_info$TERMINAL == "LEAF", ]
   fitted <- c()
@@ -233,6 +237,7 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
   }
   
   pred <- data.frame(criteria, constants, beta_hats)
+  
   # return everything
   return(list(tree = tree_info, fit = fitted, formula = formula, data = data, pred = pred, penalty = penalty))
 }
@@ -385,8 +390,6 @@ evaluate_penalties <- function(these_penalties, l_distribution, g_distribution) 
   
   return(c(best_penalty, next_best_penalty, third_best_penalty))
 }
-
-#forest
 bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # extract features
   features <- all.vars(formula)[-c(1:2)]
@@ -422,6 +425,8 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
     train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
     test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
     rownames(test_df) <- seq(1:nrow(test_df))
+    
+    tic("Bayes")
     
     min_penalty <- min(penalties)
     max_penalty <- max(penalties)
@@ -495,6 +500,9 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
     best_penalties <- evaluate_penalties(penalties, l_distribution, g_distribution)
     best_penalty <- best_penalties[1]
     
+    bayes_done <- toc()
+    bayes_time <- bayes_done$toc - bayes_done$tic
+    
     l_plot <- ggplot(data = l_distribution, aes(x = penalties, y = mean)) +
       geom_point()
     
@@ -502,6 +510,7 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
                                data = train,
                                penalty = best_penalty,
                                lag_name = first_lag)
+    bayes_tree$time <- bayes_time
     
   } else if (is.null(minsize)) {
     tree <- ar1_reg_tree(formula = formula_new,
@@ -518,36 +527,13 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
   # return the tree
   return(list(tree = bayes_tree, l_plot = l_plot))
 }
-bayes_reg_ar1_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
-  # apply the rf_tree function n_trees times with plyr::raply
-  # - track the progress with a progress bar
-  trees <- plyr::raply(
-    n_trees,
-    bayesian_sprout_ar1_tree(
-      formula = formula,
-      feature_frac = feature_frac,
-      sample_data = sample_data,
-      minsize = minsize,
-      data = data,
-      penalties = penalties
-    ),
-    .progress = "text"
-  )
-  
-  return(trees)
-}
+
+#forest
 bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
-  formula <- formula
-  n_trees <- n_trees
-  feature_frac <- feature_frac
-  sample_data <- sample_data
-  minsize <- minsize
-  data <- data
-  penalties <- penalties
   
-  split <- ceiling(detectCores()/1.2) - 1
+  split <- detectCores()/1.2
   print(paste0("Cores to use: ", as.character(split)))
   tic("Parallel")
   if(n_trees < split) {
@@ -559,8 +545,8 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
     x <- c("dplyr", "tictoc", "ggplot2")
     clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
                         "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties", 
-                        "generate_custom_random", "get_distribution",
-                        "split_lg", "get_rmses", "ar1_reg_tree", "sse_var"))
+                        "generate_custom_random", "get_distribution", "new_obj_function",
+                        "split_lg", "get_rmses", "ar1_reg_tree"))
     init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
     
     trees <- foreach(
@@ -587,8 +573,8 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
     x <- c("dplyr", "tictoc", "ggplot2")
     clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
                         "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties",
-                        "generate_custom_random", "get_distribution", 
-                        "split_lg", "get_rmses", "ar1_reg_tree", "sse_var"))
+                        "generate_custom_random", "get_distribution", "new_obj_function",
+                        "split_lg", "get_rmses", "ar1_reg_tree"))
     init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
     
     for(i in 1:iterate) {
@@ -616,7 +602,6 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   toc()
   return(trees)
 }
-
 
 #prediction
 get_prediction <- function(forest, X_test) {
@@ -653,51 +638,6 @@ monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
 
-#get a list of all 241 complete horizons
-all_months <- lapply(monthly_dates, function(x) {
-  train_df <- values_df %>% 
-    dplyr::filter(date <= x)
-  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
-  return(train_tsData)
-})
-
-all_predictions <- plyr::laply(all_months, function(x) {
-  infl_mbd <- embed(x, lag_order)
-  infl_mbd <- as.data.frame(infl_mbd)
-  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
-  
-  #set training and test sets
-  X_test <- infl_mbd[nrow(infl_mbd), ]
-  X_test$trend <- nrow(infl_mbd)
-  infl_mbd <- infl_mbd[-nrow(infl_mbd),]
-  
-  #fit the forest
-  bayes <- ar1_reg_tree(formula, data = infl_mbd, penalty = 0.9, lag_name = "tmin1")
-
-  tree_pred <- bayes$pred
-  tree_pred$criteria <- as.character(tree_pred$criteria)
-  
-  #get appropriate row from tree_info
-  tf <- c()
-  for(j in 1:nrow(tree_pred)) {
-    f <- eval(parse(text = tree_pred$criteria[j]), envir = X_test)
-    tf <- c(tf, f)
-  }
-  
-  #get constant and beta_hat and predict
-  temp_pred <- tree_pred[tf,]
-  this_constant <- temp_pred$constants
-  this_beta_hat <- temp_pred$beta_hats
-  this_lag <- X_test$tmin1
-  this_prediction <- this_constant + this_beta_hat*this_lag
-  # #get the prediction
-  # predict_rf <- get_prediction(forest = bayes, X_test = X_test)
-  # 
-  return(this_prediction)
-},
-.progress = "text"
-)
-
 tic("expanding horizon forest")
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
@@ -713,7 +653,7 @@ for (monthx in monthly_dates) {
   X_test <- infl_mbd[nrow(infl_mbd), ]
   X_test$trend <- nrow(infl_mbd)
   infl_mbd <- infl_mbd[-nrow(infl_mbd),]
- 
+  
   #fit the forest
   tic("Bayesian forest")
   bayes <- bayes_reg_parallel_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
@@ -726,75 +666,7 @@ for (monthx in monthly_dates) {
 }
 toc()
 
-
-tree_predictions <- c()
-local_all_months <- all_months
-split <- ceiling(detectCores()/1.2) - 1
-iterations <- floor(length(all_months)/split)
-get_parallel_predictions_tree <- function(these_months, split) {
-  cl <- makeCluster(split)
-  registerDoParallel(cl)
-  x <- c("dplyr", "tictoc", "ggplot2")
-  clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
-                      "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties", 
-                      "generate_custom_random", "get_distribution",
-                      "split_lg", "get_rmses", "ar1_reg_tree", "sse_var"))
-  init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
-  
-  these_predictions <- foreach(
-    these_months,
-    .combine = list,
-    .multicombine = TRUE) %dopar%
-    function(x) {
-      infl_mbd <- embed(x, lag_order)
-      infl_mbd <- as.data.frame(infl_mbd)
-      names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
-      
-      #set training and test sets
-      X_test <- infl_mbd[nrow(infl_mbd), ]
-      X_test$trend <- nrow(infl_mbd)
-      infl_mbd <- infl_mbd[-nrow(infl_mbd),]
-      bayes_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = infl_mbd, data = infl_mbd, penalties = penalties)
-      
-      tree_pred <- bayes_tree$tree$pred
-      tree_pred$criteria <- as.character(tree_pred$criteria)
-      
-      #get appropriate row from tree_info
-      tf <- c()
-      for(j in 1:nrow(tree_pred)) {
-        f <- eval(parse(text = tree_pred$criteria[j]), envir = X_test)
-        tf <- c(tf, f)
-      }
-      
-      #get constant and beta_hat and predict
-      temp_pred <- tree_pred[tf,]
-      this_constant <- temp_pred$constants
-      this_beta_hat <- temp_pred$beta_hats
-      this_lag <- X_test$tmin1
-      this_prediction <- this_constant + this_beta_hat*this_lag
-      
-      return(this_prediction)
-    }
-  
-  stopCluster(cl)
-  
-  return(these_predictions)
-}
-for(i in 1:(iterations - 1)) {
-  these_months <- local_all_months[[1:split]]
-  local_all_months <- local_all_months[[-c(1:split)]]
-  
-  these_predictions <- get_parallel_predictions_tree(these_months, split)
-  
-  tree_predictions <- c(tree_predictions, these_predictions)
-}
-split <- length(local_all_months)
-these_predictions <- get_parallel_predictions_tree(local_all_months, split)
-tree_predictions <- c(tree_predictions, these_predictions)
-
-
 forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
-tree_forecast_ts <- ts(tree_predictions, start = c(1999, 1), frequency = 12)
 
 pred_arima <- c()
 for (monthx in monthly_dates) {
@@ -809,8 +681,6 @@ for (monthx in monthly_dates) {
 }
 
 accuracy(tsData, forest_forecast_ts)
-accuracy(tsData, tree_forecast_ts)
 accuracy(tsData, pred_arima)
 
-write_rds(forecast_ts, paste0(export,"4_year_forecasts/ar1_forecast.rds"))
-write_rds(pred_arima, paste0(export, "4_year_forecasts/arima_forecast.rds"))
+write_rds(forecast_ts, paste0(export,"4_year_forecasts/ar1_obj_forecast.rds"))
