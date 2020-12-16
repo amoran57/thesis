@@ -27,12 +27,13 @@ call <- as.formula(call)
 
 penalties <- seq(0.70, 0.99, by = 0.01)
 penalty <- 0.9
-
+x <- c("dplyr", "tictoc", "ggplot2")
 formula <- call
 feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
-data <- infl_mbd[sample(1:nrow(infl_mbd), size = nrow(infl_mbd), replace = TRUE),]
+data <- infl_mbd
+n_trees <- 50
 
 #Functions ----------------------------------------------
 #foundational
@@ -532,6 +533,13 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
 bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
+  formula <- formula
+  n_trees <- n_trees
+  feature_frac <- feature_frac
+  sample_data <- sample_data
+  minsize <- minsize
+  data <- data
+  penalties <-- penalties
   
   split <- detectCores()/1.2
   print(paste0("Cores to use: ", as.character(split)))
