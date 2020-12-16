@@ -33,7 +33,7 @@ feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
-n_trees <- 10
+n_trees <- 50
 
 #Functions ----------------------------------------------
 #foundational
