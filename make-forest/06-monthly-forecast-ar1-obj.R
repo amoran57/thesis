@@ -539,7 +539,7 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   sample_data <- sample_data
   minsize <- minsize
   data <- data
-  penalties <-- penalties
+  penalties <- penalties
   
   split <- detectCores()/1.2
   print(paste0("Cores to use: ", as.character(split)))
