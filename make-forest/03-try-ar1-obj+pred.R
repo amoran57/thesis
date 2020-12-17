@@ -923,26 +923,19 @@ toc()
 bayes_ar1_tree <- bayesian_sprout_ar1_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
 grid_ar1_tree <- grid_sprout_ar1_tree(formula, feature_frac = 1, sample_data = FALSE, data = infl_mbd, penalties = penalties)
 
-#Find fits
-fit_df <- data.frame(seq(1,729))
-for(i in 1:50) {
-  temp_forest <- bayes[[i]]
-  temp_fit <- temp_forest$fit
-  fit_df <- cbind(fit_df, temp_fit)
-}
-fit_df <- fit_df[-1]
-fit_df$mean <- rowMeans(fit_df)
-bayes_forest_ar1_ts <- ts(fit_df$mean, start = c(1959, 12), frequency = 12)
+#get Bayes forest fit as ts
+fits <- lapply(bayes, function(x) answer <- x$tree$fit)
+fits_df <- do.call(cbind, fits)
+fits_df <- as.data.frame(fits_df)
+forest_fit <- rowMeans(fits_df)
+bayes_forest_ar1_ts <- ts(forest_fit, start = c(1959, 12), frequency = 12)
 
-grid_fit_df <- data.frame(seq(1,729))
-for(i in 1:50) {
-  temp_forest <- grid[[i]]
-  temp_fit <- temp_forest$fit
-  grid_fit_df <- cbind(grid_fit_df, temp_fit)
-}
-grid_fit_df <- grid_fit_df[-1]
-grid_fit_df$mean <- rowMeans(grid_fit_df)
-grid_forest_ar1_ts <- ts(grid_fit_df$mean, start = c(1959, 12), frequency = 12)
+#get grid forest fit as ts
+grid_fits <- lapply(grid, function(x) answer <- x$tree$fit)
+grid_fits_df <- do.call(cbind, grid_fits)
+grid_fits_df <- as.data.frame(grid_fits_df)
+grid_forest_fit <- rowMeans(grid_fits_df)
+grid_forest_ar1_ts <- ts(grid_forest_fit, start = c(1959, 12), frequency = 12)
 
 bayes_ar1_tree_fit <- bayes_ar1_tree$tree$fit
 bayes_tree_ar1_ts <- ts(bayes_ar1_tree_fit, start = c(1959, 12), frequency = 12)
@@ -998,4 +991,5 @@ for(i in 1:50) {
 
 
 #export ----------------------
-write_rds(grid_forest_ar1_ts, paste0(export,"grid_forest_ar1_pred.rds"))
+write_rds(grid_forest_ar1_ts, paste0(export,"grid_forest_ar1_fit.rds"))
+write_rds(bayes_forest_ar1_ts, paste0(export, "bayes_forest_ar1_fit.rds"))
