@@ -699,4 +699,4 @@ for (monthx in monthly_dates) {
 accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
 
-write_rds(forecast_ts, paste0(export,"4_year_forecasts/ar1_obj_forecast.rds"))
+write_rds(forest_forecast_ts, paste0(export,"4_year_forecasts/ar1_obj_forecast_2.rds"))
