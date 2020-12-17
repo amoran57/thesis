@@ -612,7 +612,7 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
 }
 
 results <- lapply(trees, function(x) answer <- nrow(x$tree$pred))
-
+times <- sapply(trees, function(x) answer <- x$tree$time)
 #prediction
 get_prediction <- function(forest, X_test) {
   num_trees <- length(forest)
@@ -632,12 +632,22 @@ get_prediction <- function(forest, X_test) {
       tf <- c(tf, f)
     }
     
-    #get constant and beta_hat and predict
-    temp_pred <- temp_tree_pred[tf,]
-    this_constant <- temp_pred$constants
-    this_beta_hat <- temp_pred$beta_hats
-    all_predictions[i] <- this_constant + this_beta_hat*this_lag*0.8
+    if(length(tf) > 0){
+      #get constant and beta_hat and predict
+      temp_pred <- temp_tree_pred[tf,]
+      this_constant <- temp_pred$constants
+      this_beta_hat <- temp_pred$beta_hats
+      all_predictions[i] <- this_constant + this_beta_hat*this_lag
+    } else {
+      #get constant and beta_hat and predict
+      temp_pred <- temp_tree_pred[1,]
+      this_constant <- temp_pred$constants
+      this_beta_hat <- temp_pred$beta_hats
+      all_predictions[i] <- this_constant + this_beta_hat*this_lag
+    }
+
   }
+  
   #get the forest prediction and return it
   forest_prediction <- mean(all_predictions)
   return(forest_prediction)
@@ -649,7 +659,8 @@ lag_order <- 12
 forecasts_rf <- c()
 
 tic("expanding horizon forest")
-for (monthx in monthly_dates) {
+for (i in 1:length(monthly_dates)) {
+  monthx <- monthly_dates[i]
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
     dplyr::filter(date <= monthx)
@@ -665,7 +676,9 @@ for (monthx in monthly_dates) {
   infl_mbd <- infl_mbd[-nrow(infl_mbd),]
   
   #fit the forest
-  tic("Bayesian forest")
+  timestamp()
+  print(paste0("Beginning Bayes forest number ", as.character(i)))
+  tic(paste0("Bayesian forest iteration ", as.character(i), " complete"))
   bayes <- bayes_reg_parallel_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
   toc()
   
