@@ -653,7 +653,8 @@ lag_order <- 12
 forecasts_rf <- c()
 
 tic("expanding horizon forest")
-for (monthx in monthly_dates) {
+for (k in 1:length(monthly_dates)) {
+  monthx <- monthly_dates[k]
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
     dplyr::filter(date <= monthx)
@@ -669,7 +670,8 @@ for (monthx in monthly_dates) {
   infl_mbd <- infl_mbd[-nrow(infl_mbd),]
   
   #fit the forest
-  tic("Bayesian forest")
+  timestamp()
+  tic(paste0("Bayesian forest iteration ", as.character(k), " complete"))
   bayes <- bayes_reg_parallel_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
   toc()
   
