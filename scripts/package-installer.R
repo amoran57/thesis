@@ -10,6 +10,7 @@ install.packages(c("dplyr",
                    "tictoc",
                    "readr",
                    "vars",
-                   "ggpubr"
+                   "ggpubr",
+                   "doParallel"
                    ))
                  

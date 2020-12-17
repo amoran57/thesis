@@ -11,6 +11,11 @@ library(lubridate)
 library(tictoc)
 library(vars)
 library(dplyr)
+library(parallel)
+library(iterators)
+library(foreach)
+library(doParallel)
+
 
 thesis <- paste0(getwd(),"/")
 import <- paste0(thesis,"data/import/")
