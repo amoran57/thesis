@@ -29,7 +29,7 @@ penalties <- seq(0.70, 0.99, by = 0.01)
 penalty <- 0.9
 x <- c("dplyr", "tictoc", "ggplot2")
 formula <- call
-feature_frac <- 0.7
+feature_frac <- 0.3
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
@@ -648,7 +648,7 @@ get_prediction <- function(forest, X_test) {
 }
 
 #Predict using random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2000/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
 
@@ -672,7 +672,7 @@ for (k in 1:length(monthly_dates)) {
   #fit the forest
   timestamp()
   tic(paste0("Bayesian forest iteration ", as.character(k), " complete"))
-  bayes <- bayes_reg_parallel_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
+  bayes <- bayes_reg_parallel_rf(formula, feature_frac = feature_frac, sample_data = sample_data, data = infl_mbd, penalties = penalties)
   toc()
   
   #get the prediction
