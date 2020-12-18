@@ -745,7 +745,7 @@ pred_arima <- c()
 for (monthx in monthly_dates) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
-    filter(date <= monthx)
+    filter(date < monthx)
   train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
   
   pred_a <- forecast(auto.arima(train_tsData), 1)$mean
