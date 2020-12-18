@@ -61,7 +61,7 @@ new_obj_function <- function(split_var, y, lag) {
     dplyr::arrange(split_var)
   
   y <- this_df$y
-  lag <- this_df$lag
+  x <- this_df$lag
   data_length <- length(y)
   ssr <- c()
   
@@ -147,7 +147,7 @@ for(i in 1:data_length) {
 
   
   split_at <- this_df[which.min(ssr),]$split_var
-  return(c(ssr = min(ssr), split = split_at))
+  return(c(ssr = ssr[which.min(ssr)], split = split_at))
 }
 
 tic("slow")
