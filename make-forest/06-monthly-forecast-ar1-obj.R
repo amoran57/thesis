@@ -25,54 +25,111 @@ ind <- glue::glue_collapse(x = call, " + ")
 call <- paste0("t ~ ", ind)
 call <- as.formula(call)
 
-penalties <- seq(0.70, 0.99, by = 0.01)
+penalties <- seq(0.7, 0.99, by = 0.005)
 penalty <- 0.9
-x <- c("dplyr", "tictoc", "ggplot2")
+libs <- c("dplyr", "tictoc", "ggplot2")
 formula <- call
 feature_frac <- 0.3
 sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
 n_trees <- 50
+lag_name <- "tmin1"
 
 #Functions ----------------------------------------------
 #foundational
-new_obj_function <- function(x, y, lag) {
-  this_df <- data.frame(x, y, lag) %>% 
-    dplyr::arrange(x)
+new_obj_function <- function(split_var, y, lag) {
+  this_df <- data.frame(split_var, y, lag) %>% 
+    dplyr::arrange(split_var)
   
   y <- this_df$y
-  lag <- this_df$lag
-  x <- this_df$x
-  
-  splits <- unique(x)
+  x <- this_df$lag
+  data_length <- length(y)
   ssr <- c()
   
-  for(i in seq_along(splits)) {
-    sp <- splits[i]
-    
-    first_y <- y[x < sp]
-    first_lag <- lag[x < sp]
-    second_y <- y[x >= sp]
-    second_lag <- lag[x >= sp]
-    
-    if(length(first_y) > 0) {
-      first_reg <- lm(first_y ~ first_lag)
-      first_residuals <- first_reg$residuals
-      first_ssr <- sum(first_residuals^2)
-    } else {
-      first_ssr <- 0
-    }
-    
-    second_reg <- lm(second_y ~ second_lag)
-    second_residuals <- second_reg$residuals
-    second_ssr <- sum(second_residuals^2)
-    
-    ssr[i] <- first_ssr + second_ssr
+  #calculate at the first split ----------
+  #below
+  yi_1 <- c()
+  xi_1 <- c()
+  meanx_1 <- 0
+  meany_1 <- 0
+  res_y_1 <- yi_1 - meany_1
+  res_x_1 <- xi_1 - meanx_1
+  sxx_1 <- sum(res_x_1^2)
+  sxy_1 <- sum(res_x_1*res_y_1)
+  beta_1 <- sxy_1/sxx_1
+  alpha_1 <- meany_1 - beta_1*meanx_1
+  yhati_1 <- alpha_1 + beta_1*xi_1
+  res_1 <- yi_1 - yhati_1
+  sq_res_1 <- res_1^2
+  ssr_1 <- sum(sq_res_1)
+  
+  #above
+  yi_2 <- y
+  xi_2 <- lag
+  meanx_2 <- mean(xi_2)
+  meany_2 <- mean(yi_2)
+  res_y_2 <- yi_2 - meany_2
+  res_x_2 <- xi_2 - meanx_2
+  sxx_2 <- sum(res_x_2^2)
+  sxy_2 <- sum(res_x_2*res_y_2)
+  beta_2 <- sxy_2/sxx_2
+  alpha_2 <- meany_2 - beta_2*meanx_2
+  yhati_2 <- alpha_2 + beta_2*xi_2
+  res_2 <- yi_2 - yhati_2
+  sq_res_2 <- res_2^2
+  ssr_2 <- sum(sq_res_2)
+  
+  
+  for(i in 1:data_length) {
+    #Now we update -------------
+    #update yi
+    y_new <- y[i]
+    yi_1 <- c(yi_1, y_new)
+    yi_2 <- yi_2[-1]
+    #update xi
+    x_new <- x[i]
+    xi_1 <- c(xi_1, x_new)
+    xi_2 <- xi_2[-1]
+    #update meanx
+    meanx_1 <- (meanx_1*(i - 1) + x_new)/i
+    meanx_2 <- (meanx_2*(data_length - i + 1) - x_new)/(data_length - i)
+    #update meany
+    meany_1 <- (meany_1*(i - 1) + y_new)/i
+    meany_2 <- (meany_2*(data_length - i + 1) - y_new)/(data_length - i)
+    #update sxx
+    res_x_1 <- xi_1 - meanx_1
+    res_x_2 <- xi_2 - meanx_2
+    sxx_1 <- sum(res_x_1^2)
+    sxx_2 <- sum(res_x_2^2)
+    #update sxy
+    res_y_1 <- yi_1 - meany_1
+    res_y_2 <- yi_2 - meany_2
+    sxy_1 <- sum(res_x_1*res_y_1)
+    sxy_2 <- sum(res_x_2*res_y_2)
+    #update beta
+    beta_1 <- sxy_1/sxx_1
+    beta_2 <- sxy_2/sxx_2
+    #update alpha
+    alpha_1 <- meany_1 - beta_1*meanx_1
+    alpha_2 <- meany_2 - beta_2*meanx_2
+    #update yhat
+    yhati_1 <- alpha_1 + beta_1*xi_1
+    yhati_2 <- alpha_2 + beta_2*xi_2
+    #update residuals
+    res_1 <- yi_1 - yhati_1
+    res_2 <- yi_2 - yhati_2
+    #update ssr
+    sq_res_1 <- res_1^2
+    sq_res_2 <- res_2^2
+    ssr_1 <- sum(sq_res_1)
+    ssr_2 <- sum(sq_res_2)
+    ssr[i] <- ssr_1 + ssr_2
   }
   
-  split_at <- splits[which.min(ssr)]
-  return(c(ssr = min(ssr), split = split_at))
+  
+  split_at <- this_df[which.min(ssr),]$split_var
+  return(c(ssr = ssr[which.min(ssr)], split = split_at))
 }
 ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name) {
   
@@ -551,11 +608,11 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
     cl <- makeCluster(split)
     registerDoParallel(cl)
     x <- c("dplyr", "tictoc", "ggplot2")
-    clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
+    clusterExport(cl, c("libs", "formula", "n_trees", "feature_frac", "sample_data", 
                         "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties", 
                         "generate_custom_random", "get_distribution", "new_obj_function",
                         "split_lg", "get_rmses", "ar1_reg_tree"))
-    init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
+    init <- clusterEvalQ(cl, lapply(libs, require, character.only = TRUE))
     
     trees <- foreach(
       rep(1, split),
@@ -579,11 +636,11 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
     cl <- makeCluster(split)
     registerDoParallel(cl)
     x <- c("dplyr", "tictoc", "ggplot2")
-    clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
+    clusterExport(cl, c("libs", "formula", "n_trees", "feature_frac", "sample_data", 
                         "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties",
                         "generate_custom_random", "get_distribution", "new_obj_function",
                         "split_lg", "get_rmses", "ar1_reg_tree"))
-    init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
+    init <- clusterEvalQ(cl, lapply(libs, require, character.only = TRUE))
     
     for(i in 1:iterate) {
       tic(paste0("batch ", as.character(i), " of ", as.character(iterate), " complete"))
@@ -648,7 +705,7 @@ get_prediction <- function(forest, X_test) {
 }
 
 #Predict using random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2000/1/1"), "month")
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
 
@@ -672,7 +729,7 @@ for (k in 1:length(monthly_dates)) {
   #fit the forest
   timestamp()
   tic(paste0("Bayesian forest iteration ", as.character(k), " complete"))
-  bayes <- bayes_reg_parallel_rf(formula, feature_frac = feature_frac, sample_data = sample_data, data = infl_mbd, penalties = penalties)
+  bayes <- bayes_reg_parallel_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
   toc()
   
   #get the prediction
