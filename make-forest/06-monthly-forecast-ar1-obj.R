@@ -705,7 +705,7 @@ get_prediction <- function(forest, X_test) {
 }
 
 #Predict using random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2020/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
 
