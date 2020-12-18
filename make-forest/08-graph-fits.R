@@ -26,6 +26,7 @@ plot <- ggplot(data = tidy_graph, aes(x = date, y = value, color = key)) +
   geom_line()
 plot
 
+
 accuracy(tsData, bayes_ar1)
 accuracy(tsData, grid_ar1)
 accuracy(tsData, arima_fit)

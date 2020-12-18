@@ -185,7 +185,7 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
                            },
                            x = this_data)
         
-        if(any(tmp_nobs < 2)) {
+        if(any(tmp_nobs < 10)) {
           split_here <- rep(FALSE, 2)
         }
         #end while loop
@@ -255,7 +255,7 @@ get_rmses <- function(these_penalties, formula, train_df, test_df, target, lag_n
     #predict each value in test_df
     tree_predictions <- c()
     
-    while(length(tree_predictions) < 48 | any(is.na(tree_predictions))) {
+    while(length(tree_predictions) < nrow(test_df) | any(is.na(tree_predictions))) {
       
       if(nrow(temp_tree_pred) > 1) {
         #for every prediction in temp_tree_pred
@@ -423,8 +423,8 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
     # "cross-validate" by testing the tree for each penalty over the most recent four years
     
     #get test and training data.frames
-    train_df <- train[1:(nrow(train)-48), all.vars(formula_new)]
-    test_df <- train[(nrow(train)-47):nrow(train), all.vars(formula_new)]
+    train_df <- train[1:(nrow(train)-12), all.vars(formula_new)]
+    test_df <- train[(nrow(train)-11):nrow(train), all.vars(formula_new)]
     rownames(test_df) <- seq(1:nrow(test_df))
     
     tic("Bayes")
