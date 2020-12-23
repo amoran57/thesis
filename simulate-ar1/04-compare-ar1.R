@@ -2,11 +2,11 @@
 rm(list=ls()) 
 header <- source("header.R")
 
-#Set up for tree -------------------------------
-yt <- read_rds(paste0(simulate_ar1, "simulated-data.rds"))
-obj_fit <- read_rds(paste0(simulate_ar1, "obj-fit.rds"))
-pred_fit <- read_rds(paste0(simulate_ar1, "pred-fit.rds"))
-mean_fit <- read_rds(paste0(simulate_ar1, "mean-fit.rds"))
+#Import -------------------------------
+yt <- read_rds(paste0(simulate_ar1, "ar1-data/simulated-data.rds"))
+obj_fit <- read_rds(paste0(simulate_ar1, "ar1-data/obj-fit-ar.rds"))
+pred_fit <- read_rds(paste0(simulate_ar1, "ar1-data/pred-fit-ar.rds"))
+mean_fit <- read_rds(paste0(simulate_ar1, "ar1-data/mean-fit-ar.rds"))
 model <- auto.arima(yt)
 arima_fit <- model$fitted
 
