@@ -19,9 +19,9 @@ ind <- glue::glue_collapse(x = call, " + ")
 call <- paste0("t ~ ", ind)
 call <- as.formula(call)
 
-penalties <- seq(0.7, 0.99, by = 0.005)
+penalties <- seq(0.9, 0.99, by = 0.005)
 formula <- call
-feature_frac <- 0.3
+feature_frac <- 1
 sample_data <- FALSE
 minsize <- NULL
 data <- y_mbd

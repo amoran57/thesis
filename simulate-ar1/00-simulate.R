@@ -6,12 +6,13 @@ header <- source("header.R")
 #simple AR model
 yt <- arima.sim(list(order=c(1,0,0), ar=0.9), n=511)
 
-zt <- arima.sim(list(order=c(1,0,0), ar=0.45), n=11)
 #evolving AR model
-for (i in 1:5) {
-  this_beta <- 0.45 + i*0.1
-  this_series <- arima.sim(list(order=c(1,0,0), ar=this_beta), n=100)
-  zt <- c(zt, this_series)
+x <- c(1:5)
+zt <- c(0.5)
+for (i in 1:510) {
+  this_beta <- 0.9 + sample(x,1)*0.01
+  this_number <- this_beta*zt[i] + rnorm(1)
+  zt <- c(zt, this_number)
 }
 
 zt <- ts(zt)
