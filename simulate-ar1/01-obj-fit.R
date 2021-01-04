@@ -684,3 +684,5 @@ ztree_fit <- ztree$tree$fit
 #Export ---------------------------------------
 write_rds(ytree_fit, paste0(simulate_ar1, "ar1-data/obj-fit-ar.rds"))
 write_rds(ztree_fit, paste0(simulate_ar1, "evolving-data/obj-fit-evolving.rds"))
+write_rds(forecasts_y, paste0(simulate_ar1, "ar1-data/obj-fit-forecast.rds"))
+write_rds(forecasts_z, paste0(simulate_ar1, "evolving-data/obj-fit-forecast.rds"))
