@@ -42,11 +42,11 @@ obj_fit <- read_rds(paste0(simulate_ar1, "ar1-data/obj-fit-forecast.rds"))
 model <- auto.arima(yt)
 arima_fit <- model$fitted
 
-arima_ts <- ts(arima_fit[-c(1:11)])
+arima_ts <- ts(arima_fit[c(400:500)])
 obj_ts <- ts(obj_fit)
 # pred_ts <- ts(pred_fit)
 # mean_ts <- ts(mean_fit)
-y_ts <- ts(yt[-c(1:11)])
+y_ts <- ts(yt[c(400:500)])
 
 #Compare --------------------------------------
 graph_df <- data.frame(index = seq(1, length(obj_fit)), 

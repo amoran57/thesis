@@ -33,3 +33,32 @@ accuracy(z_ts, obj_ts)
 accuracy(z_ts, pred_ts)
 accuracy(z_ts, mean_ts)
 
+#Again, with forecasts ----------------------------------------------------
+zt <- read_rds(paste0(simulate_ar1, "evolving-data/simulated-evolving.rds"))
+obj_fit <- read_rds(paste0(simulate_ar1, "evolving-data/obj-fit-forecast.rds"))
+# pred_fit <- read_rds(paste0(simulate_ar1, "evolving-data/pred-fit-forecast.rds"))
+# mean_fit <- read_rds(paste0(simulate_ar1, "evolving-data/mean-fit-forecast.rds"))
+model <- auto.arima(zt)
+arima_fit <- model$fitted
+
+arima_ts <- ts(arima_fit[c(400:500)])
+obj_ts <- ts(obj_fit)
+# pred_ts <- ts(pred_fit)
+# mean_ts <- ts(mean_fit)
+z_ts <- ts(zt[c(400:500)])
+
+#Compare --------------------------------------
+graph_df <- data.frame(index = seq(1, length(obj_fit)), 
+                       simulated = zt[c(400:500)], 
+                       arima = arima_fit[c(400:500)], 
+                       obj = obj_fit)
+tidy_graph_df <- gather(data = graph_df, key = "key", value = "value", "simulated":"obj")
+plot <- ggplot(data = tidy_graph_df, aes(x = index, y = value, color = key)) +
+  geom_line()
+plot
+
+accuracy(z_ts, arima_ts)
+accuracy(z_ts, obj_ts)
+accuracy(z_ts, pred_ts)
+accuracy(z_ts, mean_ts)
+
