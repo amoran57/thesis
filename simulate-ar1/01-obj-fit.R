@@ -609,7 +609,7 @@ tic("expanding horizon y")
 for (datex in dates) {
   #initialize training data according to expanding horizon
   train <- yt[1:datex]
-  y_mbd <-as.data.frame(embed(train, 12))
+  y_mbd <- as.data.frame(embed(train, 12))
   names(y_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
   
   #set training and test sets
