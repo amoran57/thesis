@@ -20,22 +20,35 @@ for (datex in dates) {
   model <- auto.arima(train)
   
   #get the prediction
-  prediction <- predict(model, 1)
+  prediction <- predict(model, 1)$pred
   
   forecasts_y <- c(forecasts_y, prediction)
 }
 toc()
 
 tic("expanding horizon z")
-for (datex in dates) {
+for (datex in 410:454) {
   #initialize training data according to expanding horizon
-  train <- zt[1:datex]
+  train <- ts(zt[1:datex])
   
   #make the model
   model <- auto.arima(train)
   
   #get the prediction
-  prediction <- predict(model, 1)
+  prediction <- predict(model, 1)$pred
+  
+  forecasts_z <- c(forecasts_z, prediction)
+}
+forecasts_z <- c(forecasts_z, NA_real_)
+for (datex in 456:510) {
+  #initialize training data according to expanding horizon
+  train <- ts(zt[1:datex])
+  
+  #make the model
+  model <- auto.arima(train)
+  
+  #get the prediction
+  prediction <- predict(model, 1)$pred
   
   forecasts_z <- c(forecasts_z, prediction)
 }
