@@ -495,6 +495,91 @@ bayesian_sprout_tree <- function(formula, feature_frac, sample_data = TRUE, mins
   return(list(tree = bayes_tree, l_plot = l_plot))
 }
 
+#prediction
+get_prediction <- function(tree, X_test) {
+  this_lag <- X_test$tmin1
+  
+  #get the tree
+  temp_tree_pred <- tree$tree$pred
+  temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
+  
+  #get appropriate row from tree_info
+  tf <- c()
+  for(j in 1:nrow(temp_tree_pred)) {
+    f <- eval(parse(text = temp_tree_pred$criteria[j]), envir = X_test)
+    tf <- c(tf, f)
+  }
+  
+  tf <- ifelse(length(tf) > 1, tf, c(TRUE))
+  
+  #get constant and beta_hat and predict
+  this_prediction <- temp_tree_pred[tf, "predictions"]
+  return(this_prediction)
+}
+
+#Predict using tree --------------------------------------
+dates <- seq(411,511)
+forecasts_y <- c()
+forecasts_z <- c()
+tic("expanding horizon y")
+for (datex in dates) {
+  #initialize training data according to expanding horizon
+  train <- yt[1:datex]
+  y_mbd <- as.data.frame(embed(train, 12))
+  names(y_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  
+  #set training and test sets
+  X_test <- y_mbd[nrow(y_mbd), ]
+  X_test$trend <- nrow(y_mbd)
+  y_mbd <- y_mbd[-nrow(y_mbd),]
+  
+  #fit the tree
+  tic("Make tree")
+  tree <- bayesian_sprout_ar1_tree(formula = call, 
+                                   feature_frac = feature_frac, 
+                                   sample_data = sample_data, 
+                                   minsize = minsize, 
+                                   data = y_mbd, 
+                                   penalties = penalties)
+  toc()
+  
+  #get the prediction
+  prediction <- get_prediction(tree, X_test)
+  
+  forecasts_y <- c(forecasts_y, prediction)
+}
+toc()
+
+
+tic("expanding horizon z")
+for (datex in dates) {
+  #initialize training data according to expanding horizon
+  train <- zt[1:datex]
+  z_mbd <-as.data.frame(embed(train, 12))
+  names(z_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  
+  #set training and test sets
+  X_test <- z_mbd[nrow(z_mbd), ]
+  X_test$trend <- nrow(z_mbd)
+  z_mbd <- z_mbd[-nrow(z_mbd),]
+  
+  #fit the tree
+  tic("Make tree")
+  tree <- bayesian_sprout_ar1_tree(formula = call, 
+                                   feature_frac = feature_frac, 
+                                   sample_data = sample_data, 
+                                   minsize = minsize, 
+                                   data = z_mbd, 
+                                   penalties = penalties)
+  toc()
+  
+  #get the prediction
+  prediction <- get_prediction(tree, X_test)
+  
+  forecasts_z <- c(forecasts_z, prediction)
+}
+toc()
+
 #Fit tree -------------------------------------
 ytree <- bayesian_sprout_tree(formula = call, 
                                   feature_frac = feature_frac, 
@@ -515,3 +600,5 @@ ztree_fit <- ztree$tree$fit
 #Export ---------------------------------------
 write_rds(ytree_fit, paste0(simulate_ar1, "ar1-data/mean-fit-ar.rds"))
 write_rds(ztree_fit, paste0(simulate_ar1, "evolving-data/mean-fit-evolving.rds"))
+write_rds(forecasts_y, paste0(simulate_ar1, "ar1-data/mean-fit-forecast.rds"))
+write_rds(forecasts_z, paste0(simulate_ar1, "evolving-data/mean-fit-forecast.rds"))

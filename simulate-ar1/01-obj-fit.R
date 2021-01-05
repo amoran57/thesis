@@ -602,7 +602,7 @@ get_prediction <- function(tree, X_test) {
 }
 
 #Predict using tree --------------------------------------
-dates <- seq(400,500)
+dates <- seq(411,511)
 forecasts_y <- c()
 forecasts_z <- c()
 tic("expanding horizon y")
