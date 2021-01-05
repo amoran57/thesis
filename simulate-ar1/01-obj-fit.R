@@ -591,7 +591,9 @@ get_prediction <- function(tree, X_test) {
     tf <- c(tf, f)
   }
   
-  tf <- ifelse(length(tf) > 1, tf, c(TRUE))
+  if(length(tf) == 1) {
+    tf <- c(TRUE)
+  }
   
   #get constant and beta_hat and predict
   temp_pred <- temp_tree_pred[tf,]
@@ -648,18 +650,16 @@ for (datex in dates) {
   z_mbd <- z_mbd[-nrow(z_mbd),]
   
   #fit the tree
-  tic("Make tree")
   tree <- bayesian_sprout_ar1_tree(formula = call, 
                                    feature_frac = feature_frac, 
                                    sample_data = sample_data, 
                                    minsize = minsize, 
                                    data = z_mbd, 
                                    penalties = penalties)
-  toc()
-  
+
   #get the prediction
   prediction <- get_prediction(tree, X_test)
-  
+  print(paste0("Tree number ", datex, ". Prediction result: ", prediction, "."))
   forecasts_z <- c(forecasts_z, prediction)
 }
 toc()

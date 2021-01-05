@@ -510,7 +510,9 @@ get_prediction <- function(tree, X_test) {
     tf <- c(tf, f)
   }
   
-  tf <- ifelse(length(tf) > 1, tf, c(TRUE))
+  if(length(tf) == 1) {
+    tf <- c(TRUE)
+  }
   
   #get constant and beta_hat and predict
   this_prediction <- temp_tree_pred[tf, "predictions"]
