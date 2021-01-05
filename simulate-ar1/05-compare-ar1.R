@@ -39,10 +39,9 @@ yt <- read_rds(paste0(simulate_ar1, "ar1-data/simulated-data.rds"))
 obj_fit <- read_rds(paste0(simulate_ar1, "ar1-data/obj-fit-forecast.rds"))
 pred_fit <- read_rds(paste0(simulate_ar1, "ar1-data/pred-fit-forecast.rds"))
 mean_fit <- read_rds(paste0(simulate_ar1, "ar1-data/mean-fit-forecast.rds"))
-model <- auto.arima(yt)
-arima_fit <- model$fitted
+arima_fit <- read_rds(paste0(simulate_ar1, "ar1-data/arima-forecast.rds"))
 
-arima_ts <- ts(arima_fit[c(411:511)])
+arima_ts <- ts(arima_fit)
 obj_ts <- ts(obj_fit)
 pred_ts <- ts(pred_fit)
 mean_ts <- ts(mean_fit)
@@ -51,7 +50,7 @@ y_ts <- ts(yt[c(411:511)])
 #Compare --------------------------------------
 graph_df <- data.frame(index = seq(1, length(obj_fit)), 
                        simulated = yt[c(411:511)], 
-                       arima = arima_fit[c(411:511)], 
+                       arima = arima_fit, 
                        pred = pred_fit,
                        mean = mean_fit,
                        obj = obj_fit)
