@@ -537,12 +537,12 @@ for (datex in dates) {
   
   #fit the tree
   tic("Make tree")
-  tree <- bayesian_sprout_ar1_tree(formula = call, 
-                                   feature_frac = feature_frac, 
-                                   sample_data = sample_data, 
-                                   minsize = minsize, 
-                                   data = y_mbd, 
-                                   penalties = penalties)
+  tree <- bayesian_sprout_tree(formula = call, 
+                               feature_frac = feature_frac, 
+                               sample_data = sample_data, 
+                               minsize = minsize, 
+                               data = y_mbd, 
+                               penalties = penalties)
   toc()
   
   #get the prediction
@@ -567,12 +567,12 @@ for (datex in dates) {
   
   #fit the tree
   tic("Make tree")
-  tree <- bayesian_sprout_ar1_tree(formula = call, 
-                                   feature_frac = feature_frac, 
-                                   sample_data = sample_data, 
-                                   minsize = minsize, 
-                                   data = z_mbd, 
-                                   penalties = penalties)
+  tree <- bayesian_sprout_tree(formula = call, 
+                               feature_frac = feature_frac, 
+                               sample_data = sample_data, 
+                               minsize = minsize, 
+                               data = z_mbd, 
+                               penalties = penalties)
   toc()
   
   #get the prediction
@@ -584,19 +584,19 @@ toc()
 
 #Fit tree -------------------------------------
 ytree <- bayesian_sprout_tree(formula = call, 
-                                  feature_frac = feature_frac, 
-                                  sample_data = sample_data, 
-                                  minsize = minsize, 
-                                  data = y_mbd, 
-                                  penalties = penalties)
+                              feature_frac = feature_frac, 
+                              sample_data = sample_data, 
+                              minsize = minsize, 
+                              data = y_mbd, 
+                              penalties = penalties)
 ytree_fit <- ytree$tree$fit
 
 ztree <- bayesian_sprout_tree(formula = call, 
-                                  feature_frac = feature_frac, 
-                                  sample_data = sample_data, 
-                                  minsize = minsize, 
-                                  data = z_mbd, 
-                                  penalties = penalties)
+                              feature_frac = feature_frac, 
+                              sample_data = sample_data, 
+                              minsize = minsize, 
+                              data = z_mbd, 
+                              penalties = penalties)
 ztree_fit <- ztree$tree$fit
 
 #Export ---------------------------------------
