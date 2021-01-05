@@ -583,6 +583,13 @@ for (datex in dates) {
 toc()
 
 #Fit tree -------------------------------------
+yt <- read_rds(paste0(simulate_ar1, "ar1-data/simulated-data.rds"))
+y_mbd <- as.data.frame(embed(yt, 12))
+names(y_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+zt <- read_rds(paste0(simulate_ar1, "evolving-data/simulated-evolving.rds"))
+z_mbd <- as.data.frame(embed(zt, 12))
+names(z_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+
 ytree <- bayesian_sprout_tree(formula = call, 
                               feature_frac = feature_frac, 
                               sample_data = sample_data, 
