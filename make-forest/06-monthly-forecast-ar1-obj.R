@@ -242,7 +242,7 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
                            },
                            x = this_data)
         
-        if(any(tmp_nobs < 10)) {
+        if(any(tmp_nobs < 5)) {
           split_here <- rep(FALSE, 2)
         }
         #end while loop
@@ -707,7 +707,7 @@ get_prediction <- function(forest, X_test) {
 }
 
 #Predict using random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2020/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
 
@@ -743,17 +743,7 @@ toc()
 
 forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
 
-pred_arima <- c()
-for (monthx in monthly_dates) {
-  #initialize training data according to expanding horizon
-  train_df <- values_df %>% 
-    filter(date < monthx)
-  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
-  
-  pred_a <- forecast(auto.arima(train_tsData), 1)$mean
-  
-  pred_arima <- c(pred_arima, pred_a)
-}
+pred_arima <- read_rds(paste0(export, "4_year_forecasts/arima_forecast.rds"))
 
 accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
