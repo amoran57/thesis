@@ -399,7 +399,9 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
   # bag the data
   # - randomly sample the data with replacement (duplicate are possible)
   if (sample_data == TRUE) {
-    train <- data[sample(1:nrow(data), size = nrow(data), replace = TRUE),]
+    sample_options <- seq(50, 100)
+    sample_size <- sample(sample_options, 1)
+    train <- data[(nrow(data)-sample_size):nrow(data),]
   } else {
     train <- data
   }
