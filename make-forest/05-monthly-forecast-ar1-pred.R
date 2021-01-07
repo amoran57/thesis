@@ -654,7 +654,7 @@ get_prediction <- function(forest, X_test) {
 }
 
 #Predict using random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
+monthly_dates <- seq(as.Date("2002/5/1"), as.Date("2003/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
 
@@ -822,5 +822,5 @@ accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, tree_forecast_ts)
 accuracy(tsData, pred_arima)
 
-write_rds(forecast_ts, paste0(export,"4_year_forecasts/ar1_forecast_sample.rds"))
+write_rds(forest_forecast_ts, paste0(export,"4_year_forecasts/ar1_forecast_sample.rds"))
 write_rds(pred_arima, paste0(export, "4_year_forecasts/arima_forecast.rds"))
