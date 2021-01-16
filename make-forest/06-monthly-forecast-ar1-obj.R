@@ -709,6 +709,7 @@ get_prediction <- function(forest, X_test) {
 monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2020/1/1"), "month")
 lag_order <- 12
 forecasts_rf <- c()
+sig_trees <- c()
 
 tic("expanding horizon forest")
 for (k in 1:length(monthly_dates)) {
@@ -737,6 +738,11 @@ for (k in 1:length(monthly_dates)) {
   predict_rf <- get_prediction(forest = bayes, X_test = X_test)
   
   forecasts_rf <- c(forecasts_rf, predict_rf)
+  
+  num_rows <- lapply(trees, function(x) answer <- nrow(x$tree$pred))
+  num_trees <- bayes[which(num_rows > 1)]
+  num_trees <- length(num_trees)
+  sig_trees <- c(sig_trees, num_trees)
 }
 toc()
 
