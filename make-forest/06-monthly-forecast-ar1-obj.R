@@ -242,7 +242,7 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
                            },
                            x = this_data)
         
-        if(any(tmp_nobs < 5)) {
+        if(any(tmp_nobs < 10)) {
           split_here <- rep(FALSE, 2)
         }
         #end while loop
@@ -670,7 +670,7 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   return(trees)
 }
 
-results <- lapply(trees, function(x) answer <- nrow(x$tree$pred))
+results <- lapply(bayes, function(x) answer <- nrow(x$tree$pred))
 
 #prediction
 get_prediction <- function(forest, X_test) {
@@ -707,9 +707,12 @@ get_prediction <- function(forest, X_test) {
 }
 
 #Predict using random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2020/1/1"), "month")
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
 lag_order <- 12
+variables <- all.vars(call)
+variables[1] <- "trend"
 forecasts_rf <- c()
+variable_mentions <- list()
 
 tic("expanding horizon forest")
 for (k in 1:length(monthly_dates)) {
@@ -738,8 +741,36 @@ for (k in 1:length(monthly_dates)) {
   predict_rf <- get_prediction(forest = bayes, X_test = X_test)
   
   forecasts_rf <- c(forecasts_rf, predict_rf)
+  
+  n_rows <- lapply(bayes, function(x) answer <- nrow(x$tree$pred))
+  real_trees <- bayes[which(n_rows > 1)]
+  n_real_trees <- length(real_trees)
+  if(n_real_trees > 0) {
+    real_preds_list <- lapply(real_trees, function(x) answer <- x$tree$pred)
+    real_preds <- do.call(rbind, real_preds_list)
+    real_preds$criteria <- as.character(real_preds$criteria)
+    real_criteria <- as.list(real_preds$criteria)
+    real_preds_string <- do.call(paste, real_criteria)
+    mentions <- c()
+    for(variable in variables) {
+      mentions[variable] <- str_count(real_preds_string, pattern = variable)
+    }
+    these_mentions <- data.frame(variables, mentions)
+    
+  } else {
+   these_mentions <- data.frame(variables, mentions = rep(0, length(variables)))
+  }
+  
+  variable_mentions[[k]] <- these_mentions
+  
 }
 toc()
+
+all_mentions <- lapply(variable_mentions, function(x) answer <- x$mentions)
+all_mentions_df <- data.frame(do.call(cbind, all_mentions))
+rownames(all_mentions_df) <- variables
+colnames(all_mentions_df) <- monthly_dates
+all_mentions_df$total <- rowSums(all_mentions_df)
 
 forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
 
@@ -749,3 +780,4 @@ accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
 
 write_rds(forest_forecast_ts, paste0(export,"4_year_forecasts/ar1_obj_forecast_sample.rds"))
+write_rds(all_mentions_df, paste0(export, "custom_forest_analysis/mentions.rds"))
