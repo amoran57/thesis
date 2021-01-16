@@ -716,7 +716,7 @@ variable_mentions <- list()
 all_real_trees <- c()
 
 tic("expanding horizon forest")
-for (k in 1:length(monthly_dates)) {
+for (k in 1:253) {
   monthx <- monthly_dates[k]
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
@@ -763,7 +763,7 @@ for (k in 1:length(monthly_dates)) {
   }
   
   variable_mentions[[k]] <- these_mentions
-  all_real_trees <- c(real_trees, n_real_trees)
+  all_real_trees <- c(all_real_trees, n_real_trees)
   
 }
 toc()
