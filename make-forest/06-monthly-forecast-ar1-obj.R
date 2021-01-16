@@ -242,7 +242,7 @@ ar1_reg_tree <- function(formula, data, minsize = NULL, penalty = NULL, lag_name
                            },
                            x = this_data)
         
-        if(any(tmp_nobs < 10)) {
+        if(any(tmp_nobs < 6)) {
           split_here <- rep(FALSE, 2)
         }
         #end while loop
@@ -707,12 +707,13 @@ get_prediction <- function(forest, X_test) {
 }
 
 #Predict using random forest method --------------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2003/1/1"), "month")
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2020/1/1"), "month")
 lag_order <- 12
 variables <- all.vars(call)
 variables[1] <- "trend"
 forecasts_rf <- c()
 variable_mentions <- list()
+all_real_trees <- c()
 
 tic("expanding horizon forest")
 for (k in 1:length(monthly_dates)) {
@@ -762,6 +763,7 @@ for (k in 1:length(monthly_dates)) {
   }
   
   variable_mentions[[k]] <- these_mentions
+  all_real_trees <- c(real_trees, n_real_trees)
   
 }
 toc()
@@ -771,6 +773,9 @@ all_mentions_df <- data.frame(do.call(cbind, all_mentions))
 rownames(all_mentions_df) <- variables
 colnames(all_mentions_df) <- monthly_dates
 all_mentions_df$total <- rowSums(all_mentions_df)
+t_df <- as.data.frame(t(all_mentions_df))
+t_df$real_trees <- all_real_trees
+all_mentions_df <- as.data.frame(t(t_df))
 
 forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
 
