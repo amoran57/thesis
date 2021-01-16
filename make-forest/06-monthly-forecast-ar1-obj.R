@@ -557,8 +557,7 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
     }
     
     #grab the "best" penalty
-    best_penalties <- evaluate_penalties(penalties, l_distribution, g_distribution)
-    best_penalty <- history$penalties[which.min(history$score)]
+    best_penalty <- evaluate_penalties(penalties, l_distribution, g_distribution)[1]
     
     bayes_done <- toc()
     bayes_time <- bayes_done$toc - bayes_done$tic
