@@ -599,10 +599,10 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   data <- data
   penalties <- penalties
   
-  split <- detectCores()/1.2
+  split <- ceiling(detectCores()/1.2)
   print(paste0("Cores to use: ", as.character(split)))
   tic("Parallel")
-  if(n_trees <= split) {
+  if(n_trees < split) {
     print("Will only run once")
     #reduce split and run only once
     split <- n_trees
@@ -611,8 +611,8 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
     x <- c("dplyr", "tictoc", "ggplot2")
     clusterExport(cl, c("libs", "formula", "n_trees", "feature_frac", "sample_data", 
                         "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties", 
-                        "generate_custom_random", "get_distribution", "new_obj_function",
-                        "split_lg", "get_rmses", "ar1_reg_tree"))
+                        "generate_custom_random", "get_distribution",
+                        "split_lg", "get_rmses", "ar1_reg_tree", "new_obj_function"))
     init <- clusterEvalQ(cl, lapply(libs, require, character.only = TRUE))
     
     trees <- foreach(
@@ -639,8 +639,8 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
     x <- c("dplyr", "tictoc", "ggplot2")
     clusterExport(cl, c("libs", "formula", "n_trees", "feature_frac", "sample_data", 
                         "minsize", "data", "penalties", "bayesian_sprout_ar1_tree", "evaluate_penalties",
-                        "generate_custom_random", "get_distribution", "new_obj_function",
-                        "split_lg", "get_rmses", "ar1_reg_tree"))
+                        "generate_custom_random", "get_distribution", 
+                        "split_lg", "get_rmses", "ar1_reg_tree", "new_obj_function"))
     init <- clusterEvalQ(cl, lapply(libs, require, character.only = TRUE))
     
     for(i in 1:iterate) {
@@ -669,7 +669,7 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   return(trees)
 }
 
-results <- lapply(trees, function(x) answer <- nrow(x$tree$pred))
+results <- lapply(bayes, function(x) answer <- nrow(x$tree$pred))
 
 #prediction
 get_prediction <- function(forest, X_test) {
@@ -739,7 +739,7 @@ for (k in 1:length(monthly_dates)) {
   
   forecasts_rf <- c(forecasts_rf, predict_rf)
   
-  num_rows <- lapply(trees, function(x) answer <- nrow(x$tree$pred))
+  num_rows <- lapply(bayes, function(x) answer <- nrow(x$tree$pred))
   num_trees <- bayes[which(num_rows > 1)]
   num_trees <- length(num_trees)
   sig_trees <- c(sig_trees, num_trees)
@@ -754,3 +754,35 @@ accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
 
 write_rds(forest_forecast_ts, paste0(export,"4_year_forecasts/ar1_obj_forecast_sample.rds"))
+
+
+#Why is it not working?! -----------------------------------
+for(i in 1:1000) {
+  # extract features
+  features <- all.vars(formula)[-c(1:2)]
+  # extract target
+  target <- all.vars(formula)[1]
+  #make sure we include first lag
+  first_lag <- all.vars(formula)[2]
+  #add data trend
+  data$trend <- seq(1:nrow(data))
+  # bag the data
+  # - randomly sample the data with replacement (duplicate are possible)
+  sample_options <- seq(50, 100)
+  sample_size <- sample(sample_options, 1)
+  train <- data[(nrow(data)-sample_size):nrow(data),]
+ 
+  train <- dplyr::arrange(train, trend)
+  rownames(train) <- seq(1:nrow(train))
+  # randomly sample features
+  # - only fit the regression tree with feature_frac * 100 % of the features
+  features_sample <- sample(features,
+                            size = ceiling(length(features) * feature_frac),
+                            replace = FALSE)
+  # create new formula
+  formula_new <-
+    as.formula(paste0(target, " ~ ", first_lag, " + trend + ", paste0(features_sample,
+                                                                      collapse =  " + ")))
+  
+  tree <- bayesian_sprout_ar1_tree(formula = formula_new, feature_frac = 1, sample_data = FALSE, minsize = NULL, data = train, penalties = penalties)
+}
