@@ -24,10 +24,11 @@ naive <- ts(naive_forecast, start = c(1999, 1), frequency = 12)
 
 graph_df <- data.frame(date = seq(as.Date("1999/1/1"), as.Date("2020/1/1"), "month")) %>% 
   dplyr::mutate(arima = arima_forecast,
-                # ar1 = ar1_fat_leaf_forecast,
+                ar1 = ar1_fat_leaf_forecast,
                 sample = ar1_fat_leaf_sample,
-                # mean = ar1_mean,
+                mean = ar1_mean,
                 strict_ar1 = strict_ar1,
+                naive = naive,
                 infl = infl)
 
 graph_df$ar1_diff <- graph_df$ar1 - graph_df$infl
@@ -61,10 +62,89 @@ count(graph_df, strict_closer)
 
 accuracy(tsData, ar1_ts)
 accuracy(tsData, ar1_sample_ts)
+accuracy(tsData, ar1_mean)
 accuracy(tsData, arima_forecast)
+accuracy(tsData, strict_ar1)
 accuracy(tsData, naive)
 
 mean(infl)
 mean(ar1_ts)
 mean(ar1_sample_ts)
+mean(ar1_mean)
 mean(arima_forecast)
+
+#Compare mean of forests to ARIMA ------------------------------
+mean_better <- graph_df %>% 
+  filter(mean_closer == "ar1") %>% 
+  select(date, arima, mean, infl, arima_diff, ar1_mean_diff)
+
+arima_better <- graph_df %>% 
+  filter(mean_closer == "arima") %>% 
+  select(date, arima, mean, infl, arima_diff, ar1_mean_diff)
+
+mean_tidy <- gather(mean_better, key = "key", value = "value", "arima_diff":"ar1_mean_diff")
+arima_tidy <- gather(arima_better, key = "key", value = "value", "arima_diff":"ar1_mean_diff")
+overall_tidy <- gather(graph_df, key = "key", value = "value", "arima_diff", "ar1_mean_diff")
+
+mean_plot <- ggplot(mean_tidy, aes(x = value, color = key)) +
+  # geom_histogram(binwidth = 0.002) +
+  geom_density(aes(y=0.002*..count..)) 
+mean_plot
+
+arima_plot <- ggplot(arima_tidy, aes(x = value, y = 0.5*..count.., color = key)) +
+  # geom_histogram(binwidth = 0.002) +
+  geom_density(aes(y=0.002*..count..))
+arima_plot
+
+overall_plot <- ggplot(overall_tidy, aes(x = value, y = 0.5*..count.., color = key)) +
+  # geom_histogram(binwidth = 0.002) +
+  geom_density(aes(y=0.002*..count..)) 
+overall_plot
+
+grid.arrange(mean_plot, arima_plot, overall_plot, nrow = 3, ncol = 1)
+
+hist(x = mean_better$ar1_mean_diff, freq = TRUE)
+lines(x = density(x = mean_better$ar1_mean_diff), col = "red")
+
+
+# Generate 4-part graph ----------------------------------------
+myblanktheme <- theme(plot.title = element_text(family = "Helvetica", face = "bold", size = (15)), 
+                      legend.title = element_blank(), 
+                      legend.text = element_blank(), 
+                      axis.title = element_text(),
+                      axis.text = element_text())
+
+tidy_1 <- gather(graph_df, key = "key", value = "value", "infl", "arima")
+tidy_1$key <- ifelse(tidy_1$key == "arima", "zarima", "infl")
+plot_1 <- ggplot(tidy_1, aes(x = date, y = value, color = key)) +
+  geom_line() +
+  scale_color_manual(values = c("#000000", "#5F5F5F")) +
+  labs(title = "ARIMA model", x = "", y = "") +
+  myblanktheme
+
+tidy_2 <- gather(graph_df, key = "key", value = "value", "sample", "infl")
+plot_2 <- ggplot(tidy_2, aes(x = date, y = value, color = key)) +
+  geom_line() +
+  scale_color_manual(values = c("#000000", "#5F5F5F")) +
+  ggtitle("Random Forest model") +
+  myblanktheme
+
+tidy_3 <- gather(graph_df, key = "key", value = "value", "mean", "infl")
+plot_3 <- ggplot(tidy_3, aes(x = date, y = value, color = key)) +
+  geom_line() +
+  scale_color_manual(values = c("#000000", "#5F5F5F")) +
+  ggtitle("Mean of Sampled and Non-sampled Random Forest models") +
+  myblanktheme
+
+tidy_4 <- gather(graph_df, key = "key", value = "value", "naive", "infl")
+plot_4 <- ggplot(tidy_4, aes(x = date, y = value, color = key)) +
+  geom_line() +
+  scale_color_manual(values = c("#000000", "#5F5F5F")) +
+  ggtitle("Naive model") +
+  myblanktheme
+
+grid.arrange(plot_1, plot_2, plot_3, plot_4, nrow = 2, ncol = 2,
+             top = "Inflation plotted versus models")
+
+# Export -----------------------------------------
+write_excel_csv(graph_df, paste0(export, "custom_forest_analysis/graph_df.csv"))
