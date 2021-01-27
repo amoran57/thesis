@@ -3,7 +3,7 @@ rm(list=ls())
 header <- source("header.R")
 
 #Code ------------------------------------------
-mentions <- read_rds(paste0(export, "custom_forest_analysis/mentions.rds"))
+mentions <- read_rds(paste0(export, "custom_forest_analysis/sample_mentions.rds"))
 totals <- data.frame(name = rownames(mentions), total = mentions$total)
 totals$per_forest <- totals$total/253
 totals$per_tree <- totals$per_forest/50

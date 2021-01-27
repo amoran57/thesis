@@ -30,7 +30,7 @@ penalty <- 0.9
 libs <- c("dplyr", "tictoc", "ggplot2")
 formula <- call
 feature_frac <- 0.7
-sample_data <- TRUE
+sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
 n_trees <- 50
@@ -784,5 +784,5 @@ pred_arima <- read_rds(paste0(export, "4_year_forecasts/arima_forecast.rds"))
 accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
 
-write_rds(forest_forecast_ts, paste0(export,"4_year_forecasts/ar1_obj_forecast_sample.rds"))
-write_rds(all_mentions_df, paste0(export, "custom_forest_analysis/mentions.rds"))
+write_rds(forest_forecast_ts, paste0(export,"4_year_forecasts/ar1_obj_forecast.rds"))
+write_rds(all_mentions_df, paste0(export, "custom_forest_analysis/non_sample_mentions.rds"))
