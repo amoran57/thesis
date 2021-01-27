@@ -176,7 +176,7 @@ reg_tree <- function(formula, data, minsize = NULL, penalty = NULL) {
                            },
                            x = this_data)
         
-        if(any(tmp_nobs < 2)) {
+        if(any(tmp_nobs < 11)) {
           split_here <- rep(FALSE, 2)
         }
         #end while loop
