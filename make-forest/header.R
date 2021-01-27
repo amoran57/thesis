@@ -15,6 +15,7 @@ library(parallel)
 library(iterators)
 library(foreach)
 library(doParallel)
+library(stringr)
 
 make_forest <- paste0(getwd(),"/")
 thesis <- substr(make_forest, 1, (nchar(make_forest) - 12))

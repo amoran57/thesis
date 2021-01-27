@@ -31,7 +31,9 @@ formula <- call
 feature_frac <- 0.7
 sample_data <- FALSE
 minsize <- NULL
-data <- infl_mbd[sample(1:nrow(infl_mbd), size = nrow(infl_mbd), replace = TRUE),]
+data <- infl_mbd
+lib <- c("dplyr", "tictoc", "ggplot2")
+n_trees <- 50
 
 #foundational
 sse_var <- function(x, y) {
@@ -610,7 +612,15 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
 
-  split <- detectCores()/2
+  formula <- formula
+  n_trees <- n_trees
+  feature_frac <- feature_frac
+  sample_data <- sample_data
+  minsize <- minsize
+  data <- data
+  penalties <- penalties
+  
+  split <- floor(detectCores()/1.2)
   print(paste0("Cores to use: ", as.character(split)))
   tic("Parallel")
   if(n_trees < split) {
@@ -619,12 +629,11 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
     split <- n_trees
     cl <- makeCluster(split)
     registerDoParallel(cl)
-    x <- c("dplyr", "tictoc", "ggplot2")
-    clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
+    clusterExport(cl, c("lib", "formula", "n_trees", "feature_frac", "sample_data", 
                         "minsize", "data", "penalties", "bayesian_sprout_tree", 
                         "evaluate_penalties", "generate_custom_random", "get_distribution",
                         "split_lg", "get_rmses", "reg_tree", "sse_var"))
-    init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
+    init <- clusterEvalQ(cl, lapply(lib, require, character.only = TRUE))
     
     trees <- foreach(
       rep(1, split),
@@ -647,12 +656,11 @@ bayes_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data 
     trees <- list()
     cl <- makeCluster(split)
     registerDoParallel(cl)
-    x <- c("dplyr", "tictoc", "ggplot2")
-    clusterExport(cl, c("x", "formula", "n_trees", "feature_frac", "sample_data", 
+    clusterExport(cl, c("lib", "formula", "n_trees", "feature_frac", "sample_data", 
                         "minsize", "data", "penalties", "bayesian_sprout_tree", 
                         "evaluate_penalties", "generate_custom_random", "get_distribution",
                         "split_lg", "get_rmses", "reg_tree", "sse_var"))
-    init <- clusterEvalQ(cl, lapply(x, require, character.only = TRUE))
+    init <- clusterEvalQ(cl, lapply(lib, require, character.only = TRUE))
     
     for(i in 1:iterate) {
       tic(paste0("batch"," ", as.character(i)))
@@ -697,7 +705,6 @@ grid_reg_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data =
   
   return(trees)
 }
-
 
 
 #test timing
