@@ -716,7 +716,7 @@ variable_mentions <- list()
 all_real_trees <- c()
 
 tic("expanding horizon forest")
-for (k in 1:253) {
+for (k in 244:253) {
   monthx <- monthly_dates[k]
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
@@ -772,10 +772,10 @@ all_mentions <- lapply(variable_mentions, function(x) answer <- x$mentions)
 all_mentions_df <- data.frame(do.call(cbind, all_mentions))
 rownames(all_mentions_df) <- variables
 colnames(all_mentions_df) <- monthly_dates
-all_mentions_df$total <- rowSums(all_mentions_df)
 t_df <- as.data.frame(t(all_mentions_df))
 t_df$real_trees <- all_real_trees
 all_mentions_df <- as.data.frame(t(t_df))
+all_mentions_df$total <- rowSums(all_mentions_df)
 
 forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
 
