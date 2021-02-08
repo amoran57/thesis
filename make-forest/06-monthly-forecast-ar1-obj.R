@@ -699,6 +699,38 @@ get_prediction <- function(forest, X_test) {
     temp_pred <- temp_tree_pred[tf,]
     this_constant <- temp_pred$constants
     this_beta_hat <- temp_pred$beta_hats
+    all_predictions[i] <- this_constant + this_beta_hat*this_lag
+  }
+  #get the forest prediction and return it
+  forest_prediction <- mean(all_predictions)
+  return(forest_prediction)
+}
+get_prediction_08 <- function(forest, X_test) {
+  num_trees <- length(forest)
+  this_lag <- X_test$tmin1
+  all_predictions <- c()
+  
+  for (i in 1:num_trees) {
+    #get each tree from the forest
+    temp_tree <- forest[[i]]
+    temp_tree_pred <- temp_tree$tree$pred
+    temp_tree_pred$criteria <- as.character(temp_tree_pred$criteria)
+    
+    #get appropriate row from tree_info
+    tf <- c()
+    if(nrow(temp_tree_pred) == 1) {
+      tf <- TRUE
+    } else {
+      for(j in 1:nrow(temp_tree_pred)) {
+        f <- eval(parse(text = temp_tree_pred$criteria[j]), envir = X_test)
+        tf <- c(tf, f)
+      }
+    }
+    
+    #get constant and beta_hat and predict
+    temp_pred <- temp_tree_pred[tf,]
+    this_constant <- temp_pred$constants
+    this_beta_hat <- temp_pred$beta_hats
     all_predictions[i] <- this_constant + this_beta_hat*this_lag*0.8
   }
   #get the forest prediction and return it
@@ -716,7 +748,7 @@ variable_mentions <- list()
 all_real_trees <- c()
 
 tic("expanding horizon forest")
-for (k in 244:253) {
+for (k in 1:253) {
   monthx <- monthly_dates[k]
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
@@ -784,5 +816,5 @@ pred_arima <- read_rds(paste0(export, "4_year_forecasts/arima_forecast.rds"))
 accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
 
-write_rds(forest_forecast_ts, paste0(export,"4_year_forecasts/ar1_obj_forecast.rds"))
+write_rds(forest_forecast_ts, paste0(export,"4_year_forecasts/ar1_obj_forecast_straight.rds"))
 write_rds(all_mentions_df, paste0(export, "custom_forest_analysis/non_sample_mentions.rds"))
