@@ -488,6 +488,8 @@ get_adjustment <- function(penalty, formula, train_df, test_df, target, lag_name
     }
   }
   
+  ind_var <- as.character(target)
+  
   #now we have our tree predictions
   mean_predictions <- mean(tree_predictions)
   mean_actual <- mean(test_df[ind_var])
