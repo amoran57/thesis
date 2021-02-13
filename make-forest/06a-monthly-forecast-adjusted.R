@@ -492,7 +492,10 @@ get_adjustment <- function(penalty, formula, train_df, test_df, target, lag_name
   
   #now we have our tree predictions
   mean_predictions <- mean(tree_predictions)
-  mean_actual <- mean(test_df[ind_var])
+  actual_values <- as.vector(test_df[ind_var])
+  actual_sum <- sum(actual_values)
+  actual_count <- nrow(actual_values)
+  mean_actual <- actual_sum/actual_count
   
   #get the adjustment we have to make
   adjustment <- mean_predictions/mean_actual
