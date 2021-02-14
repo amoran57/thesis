@@ -5,12 +5,11 @@ header <- source("header.R")
 #Code ------------------------------------------
 df <- read_rds(paste0(export, "master_data.rds"))
 arima_forecast <- read_rds(paste0(export, "4_year_forecasts/arima_forecast.rds"))
-ar1_fat_leaf_forecast <- read_rds(paste0(export, "4_year_forecasts/ar1_obj_forecast.rds"))
-ar1_fat_leaf_sample <- read_rds(paste0(export, "4_year_forecasts/ar1_obj_forecast_sample.rds"))
+ar1_ts <- read_rds(paste0(export, "4_year_forecasts/ar1_obj_forecast.rds"))
+ar1_sample_ts <- read_rds(paste0(export, "4_year_forecasts/ar1_obj_forecast_sample.rds"))
 strict_ar1 <- read_rds(paste0(export, "4_year_forecasts/strict_ar1_forecast.rds"))
-arima_forecast <- ts(arima_forecast, start = c(1999, 1), frequency = 12)
-ar1_ts <- ts(ar1_fat_leaf_forecast, start = c(1999, 1), frequency = 12)
-ar1_sample_ts <- ts(ar1_fat_leaf_sample, start = c(1999,1), frequency = 12)
+adjusted <- read_rds(paste0(export, "4_year_forecasts/ar1_obj_forecast_adjusted.rds"))
+straight <- read_rds(paste0(export,"4_year_forecasts/ar1_obj_forecast_straight.rds"))
 ar1_mean <- (ar1_ts + ar1_sample_ts)/2
 mean <- read_rds(paste0(export, "4_year_forecasts/mean_forecast_sample.rds"))
 
@@ -18,15 +17,16 @@ values_df <- df %>%
   dplyr::filter(year >= 1959)
 
 tsData <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
-infl <- window(tsData, start = c(1999, 1), end = c(2020, 1))
+infl <- window(tsData, start = c(1959, 1), end = c(2020, 1))
 
 naive_forecast <- window(tsData, start = c(1998, 12), end = c(2019, 12))
 naive <- ts(naive_forecast, start = c(1999, 1), frequency = 12)
 
 graph_df <- data.frame(date = seq(as.Date("1999/1/1"), as.Date("2020/1/1"), "month")) %>% 
   dplyr::mutate(arima = arima_forecast,
-                ar1 = ar1_fat_leaf_forecast,
-                sample = ar1_fat_leaf_sample,
+                ar1 = ar1_ts,
+                sample = ar1_sample_ts,
+                adjusted = adjusted,
                 ar1_mean = ar1_mean,
                 mean = mean,
                 strict_ar1 = strict_ar1,
@@ -70,6 +70,7 @@ accuracy(tsData, ar1_ts)
 accuracy(tsData, mean)
 accuracy(tsData, ar1_sample_ts)
 accuracy(tsData, ar1_mean)
+accuracy(tsData, adjusted)
 accuracy(tsData, arima_forecast)
 accuracy(tsData, strict_ar1)
 accuracy(tsData, naive)
