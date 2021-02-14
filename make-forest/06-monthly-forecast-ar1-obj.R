@@ -30,7 +30,7 @@ penalty <- 0.9
 libs <- c("dplyr", "tictoc", "ggplot2")
 formula <- call
 feature_frac <- 0.7
-sample_data <- TRUE
+sample_data <- FALSE
 minsize <- NULL
 data <- infl_mbd
 n_trees <- 50
