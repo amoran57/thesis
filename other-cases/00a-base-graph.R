@@ -27,27 +27,6 @@ plot <- ggplot(data = tidy_graph, aes(x = date, y = value, color = key)) +
   geom_line()
 plot
 
-# Compare sample vs regular and ARIMA ---------------
-count(graph_df, closer)
-count(graph_df, mean_closer)
-count(graph_df, sample_closer)
-count(graph_df, ar1_mean_closer)
-count(graph_df, any_closer)
-count(graph_df, strict_closer)
 
-accuracy(tsData, ar1_ts)
-accuracy(tsData, mean)
-accuracy(tsData, ar1_sample_ts)
-accuracy(tsData, ar1_mean)
-accuracy(tsData, adjusted)
-accuracy(tsData, arima_forecast)
-accuracy(tsData, strict_ar1)
-accuracy(tsData, naive)
-
-mean(infl)
-mean(ar1_ts)
-mean(ar1_sample_ts)
-mean(ar1_mean)
-mean(arima_forecast)
 
 
