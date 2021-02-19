@@ -17,7 +17,7 @@ values_df <- df %>%
   dplyr::filter(year >= 1959)
 
 tsData <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
-infl <- window(tsData, start = c(1959, 1), end = c(2020, 1))
+infl <- window(tsData, start = c(1999, 1), end = c(2020, 1))
 
 naive_forecast <- window(tsData, start = c(1998, 12), end = c(2019, 12))
 naive <- ts(naive_forecast, start = c(1999, 1), frequency = 12)
