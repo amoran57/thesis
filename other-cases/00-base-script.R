@@ -745,8 +745,26 @@ toc()
 
 
 forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
-pred_arima <- read_rds(paste0(export, "4_year_forecasts/arima_forecast.rds"))
 
+#Predict using ARIMA -----------------------------
+pred_arima <- c()
+for (monthx in monthly_dates) {
+  #initialize training data according to expanding horizon
+  train_df <- values_df %>%
+    filter(date < monthx)
+  train_tsData <- ts(train_df$unemp, start = c(1959, 1), frequency = 12)
+  
+  pred_a <- forecast(auto.arima(train_tsData), 1)$mean
+  
+  pred_arima <- c(pred_arima, pred_a)
+}
+pred_arima <- ts(pred_arima, start = c(1999,1), frequency = 12)
+
+#Compare ----------------------------------------
 accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
+
+#Export ----------------------------------
+write_rds(forest_forecast_ts, paste0(export,"other_cases/forecast.rds"))
+write_rds(pred_arima, paste0(export, "other_cases/arima_forecast.rds"))
 

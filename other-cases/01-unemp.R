@@ -8,7 +8,7 @@ df <- read_rds(paste0(export, "master_data.rds"))
 values_df <- df %>% 
   dplyr::filter(year >= 1949)
 
-tsData <- ts(values_df$unemp, start = c(1959, 1), frequency = 12)
+tsData <- ts(values_df$unemp, start = c(1949, 1), frequency = 12)
 
 unemp_mbd <- embed(values_df$unemp, 12)
 unemp_mbd <- as.data.frame(unemp_mbd)
@@ -669,9 +669,6 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   toc()
   return(trees)
 }
-
-results <- lapply(bayes, function(x) answer <- nrow(x$tree$pred))
-
 #prediction
 get_prediction <- function(forest, X_test) {
   num_trees <- length(forest)
@@ -714,12 +711,12 @@ variables[1] <- "trend"
 forecasts_rf <- c()
 
 tic("expanding horizon forest")
-for (k in 1:253) {
+for (k in 1:121) {
   monthx <- monthly_dates[k]
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
     dplyr::filter(date <= monthx)
-  train_tsData <- ts(train_df$unemp, start = c(1959, 1), frequency = 12)
+  train_tsData <- ts(train_df$unemp, start = c(1949, 1), frequency = 12)
   
   unemp_mbd <- embed(train_tsData, lag_order)
   unemp_mbd <- as.data.frame(unemp_mbd)
@@ -744,9 +741,26 @@ for (k in 1:253) {
 toc()
 
 
-forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
-pred_arima <- read_rds(paste0(export, "4_year_forecasts/arima_forecast.rds"))
+forest_forecast_ts <- ts(forecasts_rf, start = c(1990, 1), frequency = 12)
+#Predict using ARIMA -----------------------------
+pred_arima <- c()
+for (monthx in monthly_dates) {
+  #initialize training data according to expanding horizon
+  train_df <- values_df %>%
+    filter(date < monthx)
+  train_tsData <- ts(train_df$unemp, start = c(1949, 1), frequency = 12)
+  
+  pred_a <- forecast(auto.arima(train_tsData), 1)$mean
+  
+  pred_arima <- c(pred_arima, pred_a)
+}
+pred_arima <- ts(pred_arima, start = c(1990,1), frequency = 12)
 
+#Compare -----------------------------------
 accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
+
+#Export ----------------------------------
+write_rds(forest_forecast_ts, paste0(export,"other_cases/unemp/forecast.rds"))
+write_rds(pred_arima, paste0(export, "other_cases/unemp/arima_forecast.rds"))
 
