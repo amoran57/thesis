@@ -429,11 +429,27 @@ for (k in 1:length(monthly_dates)) {
 }
 toc()
 
-
 forest_forecast_ts <- ts(forecasts_rf, start = c(2010, 1), frequency = 12)
+
+#Predict using AR(1) method --------------------------
+pred_ar1 <- c()
+for (k in 1:length(monthly_dates)) {
+  monthx <- monthly_dates[k]
+  #initialize training data according to expanding horizon
+  train_df <- values_df %>%
+    filter(date < monthx)
+  train_tsData <- ts(train_df$infl, start = c(1988, 2), frequency = 12)
+  
+  pred_a <- forecast(arima(train_tsData, order = c(1,0,0)), 1)$mean
+  
+  pred_ar1[k] <- pred_a
+}
+pred_ar1 <- ts(pred_arima, start = c(2010,1), frequency = 12)
 
 #Compare ----------------------------------------
 accuracy(tsData, forest_forecast_ts)
+accuracy(tsData, pred_ar1)
 
 #Export ----------------------------------
 write_rds(forest_forecast_ts, paste0(export,"other_cases/uk_inflation/base_forecast.rds"))
+write_rds(pred_ar1, paste0(export, "other_cases/uk_inflation/ar1_forecast.rds"))
