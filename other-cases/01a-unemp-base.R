@@ -27,7 +27,7 @@ call <- as.formula(call)
 
 penalties <- seq(0.7, 0.99, by = 0.005)
 penalty <- 0.9
-libs <- c("dplyr", "tictoc", "ggplot2")
+lib <- c("dplyr", "tictoc", "ggplot2")
 formula <- call
 feature_frac <- 0.7
 sample_data <- TRUE
@@ -410,7 +410,7 @@ for (k in 1:length(monthly_dates)) {
   #fit the forest
   timestamp()
   tic(paste0("Bayesian forest iteration ", as.character(k), " complete"))
-  bayes <- bayes_reg_parallel_rf(formula, sample_data = sample_data, data = unemp_mbd, penalties = penalties)
+  bayes <- parallel_reg_rf(formula, sample_data = sample_data, data = unemp_mbd, penalty = 0.9)
   toc()
   
   #get the prediction
@@ -436,7 +436,7 @@ for (k in 1:length(monthly_dates)) {
   
   pred_ar1[k] <- pred_a
 }
-pred_ar1 <- ts(pred_arima, start = c(1990,1), frequency = 12)
+pred_ar1 <- ts(pred_ar1, start = c(1990,1), frequency = 12)
 
 #Compare ----------------------------------------
 accuracy(tsData, forest_forecast_ts)
