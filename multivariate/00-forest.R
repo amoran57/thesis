@@ -28,6 +28,8 @@ infl_mbd <- data.frame(raw_mbd, other_vars)
 rownames(infl_mbd) <- seq(1:nrow(raw_mbd))
 features <- colnames(infl_mbd)[-1]
 
+dated_mbd <- data.frame(date = values_df$date[-c(1:11)], infl_mbd)
+
 #get formula call
 ind <- glue::glue_collapse(x = features, " + ")
 call <- paste0("t ~ ", ind)
@@ -724,23 +726,19 @@ tic("expanding horizon forest")
 for (k in 1:length(monthly_dates)) {
   monthx <- monthly_dates[k]
   #initialize training data according to expanding horizon
-  train_df <- values_df %>% 
-    dplyr::filter(date <= monthx)
-  train_tsData <- ts(train_df$infl, start = c(1962, 1), frequency = 12)
-  
-  infl_mbd <- embed(train_tsData, lag_order)
-  infl_mbd <- as.data.frame(infl_mbd)
-  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  this_df <- dated_mbd %>% 
+    dplyr::filter(date <= monthx) %>% 
+    dplyr::select(-date)
   
   #set training and test sets
-  X_test <- infl_mbd[nrow(infl_mbd), ]
-  X_test$trend <- nrow(infl_mbd)
-  infl_mbd <- infl_mbd[-nrow(infl_mbd),]
+  X_test <- this_df[nrow(this_df), ]
+  X_test$trend <- nrow(this_df)
+  this_df <- this_df[-nrow(this_df),]
   
   #fit the forest
   timestamp()
   tic(paste0("Bayesian forest iteration ", as.character(k), " complete"))
-  bayes <- bayes_reg_parallel_rf(formula, sample_data = sample_data, data = infl_mbd, penalties = penalties)
+  bayes <- bayes_reg_parallel_rf(formula, sample_data = sample_data, data = this_df, penalties = penalties)
   toc()
   
   #get the prediction
