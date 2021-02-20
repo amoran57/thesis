@@ -773,6 +773,6 @@ accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
 
 #Export ----------------------------------
-write_rds(forest_forecast_ts, paste0(export,"other_cases/forecast.rds"))
-write_rds(pred_arima, paste0(export, "other_cases/arima_forecast.rds"))
+write_rds(forest_forecast_ts, paste0(export,"other_cases/uk_inflation/forecast.rds"))
+write_rds(pred_arima, paste0(export, "other_cases/uk_inflation/arima_forecast.rds"))
 
