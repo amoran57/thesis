@@ -6,6 +6,8 @@ header <- source("header.R")
 df <- read_rds(paste0(export, "master_data.rds"))
 arima_forecast <- read_rds(paste0(export, "other_cases/unemp/arima_forecast.rds"))
 forest_forecast <- read_rds(paste0(export, "other_cases/unemp/forecast.rds"))
+ar1_forecast <- read_rds(paste0(export, "other_cases/unemp/ar1_forecast.rds"))
+base_forecast <- read_rds(paste0(export, "other_cases/unemp/base_forecast.rds"))
 
 values_df <- df %>% 
   dplyr::filter(year >= 1949)
@@ -28,6 +30,8 @@ plot <- ggplot(data = tidy_graph, aes(x = date, y = value, color = key)) +
   geom_line()
 plot
 
-
-
-
+accuracy(tsData, arima_forecast)
+accuracy(tsData, forest_forecast)
+accuracy(tsData, ar1_forecast)
+accuracy(tsData, base_forecast)
+accuracy(tsData, naive)

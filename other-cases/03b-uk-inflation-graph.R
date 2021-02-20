@@ -6,6 +6,8 @@ header <- source("header.R")
 df <- read.csv(paste0(import, "UKCPI.csv"))
 arima_forecast <- read_rds(paste0(export, "other_cases/uk_inflation/arima_forecast.rds"))
 forest_forecast <- read_rds(paste0(export, "other_cases/uk_inflation/forecast.rds"))
+ar1_forecast <- read_rds(paste0(export, "other_cases/uk_inflation/ar1_forecast.rds"))
+base_forecast <- read_rds(paste0(export, "other_cases/uk_inflation/base_forecast.rds"))
 
 values_df <- df[-c(1:172),]
 colnames(values_df) <- c("date", "cpi")
@@ -36,3 +38,9 @@ tidy_graph <- gather(data = graph_df, key = "key", value = "value", "arima":"inf
 plot <- ggplot(data = tidy_graph, aes(x = date, y = value, color = key)) +
   geom_line()
 plot
+
+accuracy(tsData, arima_forecast)
+accuracy(tsData, forest_forecast)
+accuracy(tsData, ar1_forecast)
+accuracy(tsData, base_forecast)
+accuracy(tsData, naive)
