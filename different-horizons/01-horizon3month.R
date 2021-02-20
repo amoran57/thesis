@@ -590,7 +590,7 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
 }
 
 #forest
-bayes_reg_parallel_rf <- function(formula, n_trees = 100, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
   formula <- formula
