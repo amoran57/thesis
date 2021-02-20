@@ -25,7 +25,7 @@ for (k in 1:length(monthly_dates)) {
   
   df_train_ts <- ts(df_train, start = c(1962, 1), frequency = 12)
   
-  model <- VAR(df_train_ts, lag.max = 12, ic = "AIC", type = "both")
+  model <- VAR(df_train_ts, lag.max = 6, ic = "AIC", type = "both")
   
   prediction_list <- predict(model, n.ahead = 1)
   forecast_list <- prediction_list$fcst
