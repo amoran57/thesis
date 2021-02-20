@@ -714,7 +714,7 @@ variables[1] <- "trend"
 forecasts_rf <- c()
 
 tic("expanding horizon forest")
-for (k in 1:121) {
+for (k in 1:length(monthly_dates)) {
   monthx <- monthly_dates[k]
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
@@ -739,7 +739,7 @@ for (k in 1:121) {
   #get the prediction
   predict_rf <- get_prediction(forest = bayes, X_test = X_test)
   
-  forecasts_rf <- c(forecasts_rf, predict_rf)
+  forecasts_rf[k] <- predict_rf
 }
 toc()
 
@@ -748,7 +748,8 @@ forest_forecast_ts <- ts(forecasts_rf, start = c(1985, 1), frequency = 12)
 
 #Predict using ARIMA -----------------------------
 pred_arima <- c()
-for (monthx in monthly_dates) {
+for (k in 1:length(monthly_dates)) {
+  monthx <- monthly_dates[k]
   #initialize training data according to expanding horizon
   train_df <- values_df %>%
     filter(date < monthx)
@@ -756,7 +757,7 @@ for (monthx in monthly_dates) {
   
   pred_a <- forecast(auto.arima(train_tsData), 1)$mean
   
-  pred_arima <- c(pred_arima, pred_a)
+  pred_arima[k] <- pred_a
 }
 pred_arima <- ts(pred_arima, start = c(1985,1), frequency = 12)
 
