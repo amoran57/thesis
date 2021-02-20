@@ -12,19 +12,20 @@ tsData <- ts(values_df$infl, start = c(1959, 1), frequency = 12)
 
 infl_mbd <- embed(values_df$infl, 12)
 infl_mbd <- as.data.frame(infl_mbd)
-names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+
+features <- as.character(seq(1:11))
+for(i in 1:length(features)) {
+  features[i] <- paste0("tmin", as.character(i))
+}
+names(infl_mbd) <- c("t", features)
 rownames(infl_mbd) <- seq(1:nrow(infl_mbd))
 
 #get formula call
-call <- as.character(seq(1:(length(infl_mbd)- 1)))
-for(i in 1:length(call)) {
-  call[i] <- paste0("tmin", as.character(i))
-}
-
-ind <- glue::glue_collapse(x = call, " + ")
+ind <- glue::glue_collapse(x = features, " + ")
 call <- paste0("t ~ ", ind)
 call <- as.formula(call)
 
+#set parameters
 penalties <- seq(0.7, 0.99, by = 0.005)
 penalty <- 0.9
 libs <- c("dplyr", "tictoc", "ggplot2")
@@ -589,7 +590,7 @@ bayesian_sprout_ar1_tree <- function(formula, feature_frac, sample_data = TRUE, 
 }
 
 #forest
-bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
+bayes_reg_parallel_rf <- function(formula, n_trees = 100, feature_frac = 0.7, sample_data = TRUE, minsize = NULL, data, penalties = NULL) {
   # apply the rf_tree function n_trees times with plyr::raply
   # - track the progress with a progress bar
   formula <- formula
@@ -670,8 +671,6 @@ bayes_reg_parallel_rf <- function(formula, n_trees = 50, feature_frac = 0.7, sam
   return(trees)
 }
 
-results <- lapply(bayes, function(x) answer <- nrow(x$tree$pred))
-
 #prediction
 get_prediction <- function(forest, X_test) {
   num_trees <- length(forest)
@@ -714,16 +713,25 @@ variables[1] <- "trend"
 forecasts_rf <- c()
 
 tic("expanding horizon forest")
-for (k in 1:253) {
+for (k in 1:length(monthly_dates)) {
   monthx <- monthly_dates[k]
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
     dplyr::filter(date <= monthx)
   train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
   
-  infl_mbd <- embed(train_tsData, lag_order)
-  infl_mbd <- as.data.frame(infl_mbd)
-  names(infl_mbd) <- c("t", "tmin1", "tmin2","tmin3","tmin4","tmin5","tmin6","tmin7","tmin8","tmin9","tmin10","tmin11")
+  raw_mbd <- embed(train_tsData, lag_order)
+  raw_mbd <- as.data.frame(raw_mbd)
+  
+  #adjust for the 3 month horizon
+  this_y <- raw_mbd[,1]
+  this_x <- raw_mbd[,-1]
+  
+  adj_y <- this_y[-c(1:5)]
+  adj_x <- this_x[-c((nrow(this_x)-4):nrow(this_x)),]
+  
+  infl_mbd <- data.frame(adj_y, adj_x)
+  names(infl_mbd) <- c("t", features)
   
   #set training and test sets
   X_test <- infl_mbd[nrow(infl_mbd), ]
@@ -743,28 +751,29 @@ for (k in 1:253) {
 }
 toc()
 
-
 forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
 
 #Predict using ARIMA -----------------------------
+arima_monthly_dates <- seq(as.Date("1998/7/1"), as.Date("2019/7/1"), "month") 
 pred_arima <- c()
-for (monthx in monthly_dates) {
+for (k in 1:length(arima_monthly_dates)) {
+  monthx <- arima_monthly_dates[k]
   #initialize training data according to expanding horizon
   train_df <- values_df %>%
-    filter(date < monthx)
-  train_tsData <- ts(train_df$unemp, start = c(1959, 1), frequency = 12)
+    filter(date <= monthx)
+  train_tsData <- ts(train_df$infl, start = c(1959, 1), frequency = 12)
   
-  pred_a <- forecast(auto.arima(train_tsData), 1)$mean
+  pred_a <- forecast(auto.arima(train_tsData), 6)$mean[6]
   
-  pred_arima <- c(pred_arima, pred_a)
+  pred_arima[k] <- pred_a
 }
 pred_arima <- ts(pred_arima, start = c(1999,1), frequency = 12)
+
 
 #Compare ----------------------------------------
 accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
 
 #Export ----------------------------------
-write_rds(forest_forecast_ts, paste0(export,"other_cases/forecast.rds"))
-write_rds(pred_arima, paste0(export, "other_cases/arima_forecast.rds"))
-
+write_rds(forest_forecast_ts, paste0(export,"different_horizons/horizon6month/forecast.rds"))
+write_rds(pred_arima, paste0(export, "different_horizons/horizon6month/arima_forecast.rds"))
