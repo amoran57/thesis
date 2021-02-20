@@ -13,7 +13,7 @@ values_df <- df %>%
 tsData <- ts(values_df$infl, start = c(1962,1), frequency = 12)
 
 #Set model ----------------------------------
-monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2019/1/1"), "month")
+monthly_dates <- seq(as.Date("1999/1/1"), as.Date("2020/1/1"), "month")
 var_pred <- c()
 
 tic("var")
