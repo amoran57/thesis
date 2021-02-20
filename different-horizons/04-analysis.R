@@ -48,7 +48,7 @@ graph_df <- data.frame(date = seq(as.Date("1999/1/1"), as.Date("2020/1/1"), "mon
                 naive = naive,
                 infl = infl)
 
-tidy_graph <- gather(data = graph_df, key = "key", value = "value", "arima":"infl")
+tidy_graph <- gather(data = graph_df, key = "key", value = "value", "arima_3":"infl")
 
 plot <- ggplot(data = tidy_graph, aes(x = date, y = value, color = key)) +
   geom_line()
