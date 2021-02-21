@@ -3,16 +3,16 @@ rm(list=ls())
 header <- source("header.R")
 
 #Code ------------------------------------------
-df <- read_rds(paste0(export, "master_data.rds"))
+df <- read_rds(paste0(export, "other_cases/built_data.rds"))
 arima_forecast <- read_rds(paste0(export, "other_cases/rate3month/arima_forecast.rds"))
 forest_forecast <- read_rds(paste0(export, "other_cases/rate3month/forecast.rds"))
 ar1_forecast <- read_rds(paste0(export, "other_cases/rate3month/ar1_forecast.rds"))
 base_forecast <- read_rds(paste0(export, "other_cases/rate3month/base_forecast.rds"))
 
 values_df <- df %>% 
-  dplyr::filter(year >= 1944)
+  dplyr::filter(lubridate::year(date) >= 1948)
 
-tsData <- ts(values_df$rate3month, start = c(1944, 1), frequency = 12)
+tsData <- ts(values_df$rate3month, start = c(1948, 1), frequency = 12)
 rate3month <- window(tsData, start = c(1985, 1), end = c(1995, 1))
 
 naive_forecast <- window(tsData, start = c(1984, 12), end = c(1994, 12))

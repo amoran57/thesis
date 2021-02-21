@@ -3,14 +3,15 @@ rm(list=ls())
 header <- source("header.R")
 
 #Code ------------------------------------------
-df <- read_rds(paste0(export, "master_data.rds"))
+df <- read_rds(paste0(export, "other_cases/built_data.rds"))
+
 arima_forecast <- read_rds(paste0(export, "other_cases/unemp/arima_forecast.rds"))
 forest_forecast <- read_rds(paste0(export, "other_cases/unemp/forecast.rds"))
 ar1_forecast <- read_rds(paste0(export, "other_cases/unemp/ar1_forecast.rds"))
 base_forecast <- read_rds(paste0(export, "other_cases/unemp/base_forecast.rds"))
 
 values_df <- df %>% 
-  dplyr::filter(year >= 1949)
+  dplyr::filter(lubridate::year(date) >= 1949)
 
 tsData <- ts(values_df$unemp, start = c(1949, 1), frequency = 12)
 unemp <- window(tsData, start = c(1990, 1), end = c(2000, 1))
