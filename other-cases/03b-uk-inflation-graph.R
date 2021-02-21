@@ -27,7 +27,7 @@ infl <- window(tsData, start = c(2010, 1), end = c(2020, 1))
 naive_forecast <- window(tsData, start = c(2009, 12), end = c(2019, 12))
 naive <- ts(naive_forecast, start = c(2010, 1), frequency = 12)
 
-graph_df <- data.frame(date = seq(as.Date("1985/1/1"), as.Date("1995/1/1"), "month")) %>% 
+graph_df <- data.frame(date = seq(as.Date("2010/1/1"), as.Date("2020/1/1"), "month")) %>% 
   dplyr::mutate(arima = arima_forecast,
                 forest = forest_forecast,
                 infl = infl)
