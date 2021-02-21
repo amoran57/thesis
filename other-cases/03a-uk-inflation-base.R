@@ -453,3 +453,4 @@ accuracy(tsData, pred_ar1)
 #Export ----------------------------------
 write_rds(forest_forecast_ts, paste0(export,"other_cases/uk_inflation/base_forecast.rds"))
 write_rds(pred_ar1, paste0(export, "other_cases/uk_inflation/ar1_forecast.rds"))
+#R2R
