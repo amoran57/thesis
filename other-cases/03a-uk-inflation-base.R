@@ -8,6 +8,7 @@ df <- read.csv(paste0(import, "UKCPI.csv"))
 values_df <- df[-c(1:172),]
 colnames(values_df) <- c("date", "cpi")
 values_df$date <- seq(as.Date("1988/1/1"), as.Date("2021/1/1"), "month")
+values_df$cpi <- as.character(values_df$cpi)
 values_df$cpi <- as.numeric(values_df$cpi)
 values_df <- values_df %>% 
   mutate(l_cpi = log(cpi),
@@ -16,7 +17,6 @@ values_df <- values_df %>%
   dplyr::select(date, infl)
 values_df <- values_df[-1,]
 rownames(values_df) <- seq(1, nrow(values_df))
-
 tsData <- ts(values_df$infl, start = c(1988, 2), frequency = 12)
 
 infl_mbd <- embed(values_df$infl, 12)

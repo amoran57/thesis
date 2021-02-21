@@ -12,6 +12,7 @@ base_forecast <- read_rds(paste0(export, "other_cases/uk_inflation/base_forecast
 values_df <- df[-c(1:172),]
 colnames(values_df) <- c("date", "cpi")
 values_df$date <- seq(as.Date("1988/1/1"), as.Date("2021/1/1"), "month")
+values_df$cpi <- as.character(values_df$cpi)
 values_df$cpi <- as.numeric(values_df$cpi)
 values_df <- values_df %>% 
   mutate(l_cpi = log(cpi),
