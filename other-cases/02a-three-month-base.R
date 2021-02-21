@@ -3,12 +3,12 @@ rm(list=ls())
 header <- source("header.R")
 
 #Code ------------------------------------------
-df <- read_rds(paste0(export, "master_data.rds"))
+df <- read_rds(paste0(export, "other_cases/built_data.rds"))
 
 values_df <- df %>% 
-  dplyr::filter(year >= 1944)
+  dplyr::filter(lubridate::year(date) >= 1948)
 
-tsData <- ts(values_df$rate3month, start = c(1944, 1), frequency = 12)
+tsData <- ts(values_df$rate3month, start = c(1948, 1), frequency = 12)
 
 rate3month_mbd <- embed(values_df$rate3month, 12)
 rate3month_mbd <- as.data.frame(rate3month_mbd)
@@ -396,7 +396,7 @@ for (k in 1:length(monthly_dates)) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>% 
     dplyr::filter(date <= monthx)
-  train_tsData <- ts(train_df$rate3month, start = c(1944, 1), frequency = 12)
+  train_tsData <- ts(train_df$rate3month, start = c(1948, 1), frequency = 12)
   
   rate3month_mbd <- embed(train_tsData, lag_order)
   rate3month_mbd <- as.data.frame(rate3month_mbd)
@@ -429,7 +429,7 @@ for (k in 1:length(monthly_dates)) {
   #initialize training data according to expanding horizon
   train_df <- values_df %>%
     filter(date < monthx)
-  train_tsData <- ts(train_df$infl, start = c(1944, 1), frequency = 12)
+  train_tsData <- ts(train_df$rate3month, start = c(1948, 1), frequency = 12)
   
   pred_a <- forecast(arima(train_tsData, order = c(1,0,0)), 1)$mean
   

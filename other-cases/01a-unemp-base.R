@@ -3,10 +3,10 @@ rm(list=ls())
 header <- source("header.R")
 
 #Code ------------------------------------------
-df <- read_rds(paste0(export, "master_data.rds"))
+df <- read_rds(paste0(export, "other_cases/built_data.rds"))
 
 values_df <- df %>% 
-  dplyr::filter(year >= 1949)
+  dplyr::filter(lubridate::year(date) >= 1949)
 
 tsData <- ts(values_df$unemp, start = c(1949, 1), frequency = 12)
 
