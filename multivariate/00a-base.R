@@ -416,7 +416,7 @@ for (k in 1:length(monthly_dates)) {
   #fit the forest
   timestamp()
   tic(paste0("Bayesian forest iteration ", as.character(k), " complete"))
-  bayes <- parallel_reg_rf(formula, sample_data = sample_data, data = this_df, penalties = penalties)
+  bayes <- parallel_reg_rf(formula, sample_data = sample_data, data = this_df, penalty = penalty)
   toc()
   
   #get the prediction
