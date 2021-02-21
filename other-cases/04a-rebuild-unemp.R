@@ -56,10 +56,10 @@ full_df$lag_ar1_forecast <- full_df$core - full_df$ar1
 full_df$lag_base_forecast <- full_df$core - full_df$base
 
 #Delag them
-detrend_arima_forecast <- ts(full_df$lag_ar1_forecast[-c(1:504)], start = c(1989, 12), frequency = 12)
-detrend_forest_forecast <- ts(full_df$lag_ar1_forecast[-c(1:504)], start = c(1989, 12), frequency = 12)
+detrend_arima_forecast <- ts(full_df$lag_arima_forecast[-c(1:504)], start = c(1989, 12), frequency = 12)
+detrend_forest_forecast <- ts(full_df$lag_forest_forecast[-c(1:504)], start = c(1989, 12), frequency = 12)
 detrend_ar1_forecast <- ts(full_df$lag_ar1_forecast[-c(1:504)], start = c(1989, 12), frequency = 12)
-detrend_base_forecast <- ts(full_df$lag_ar1_forecast[-c(1:504)], start = c(1989, 12), frequency = 12)
+detrend_base_forecast <- ts(full_df$lag_base_forecast[-c(1:504)], start = c(1989, 12), frequency = 12)
 detrend_naive_forecast <- ts(original_ts$lag_naive[-c(1:2)], start = c(1948, 2), frequency = 12)
 
 #Detrend them to get the original forecast
