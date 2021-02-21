@@ -3,17 +3,20 @@ rm(list=ls())
 header <- source("header.R")
 
 #Code ------------------------------------------
+us_df <- read_rds(paste0(export, "master_data.rds"))
 df <- read_rds(paste0(export, "other_cases/built_data.rds"))
-arima_forecast <- read_rds(arima_forecast, paste0(export, "other_cases/rate3month/retransformed_forecasts/arima_forecast.rds"))
-forest_forecast <- read_rds(forest_forecast, paste0(export, "other_cases/rate3month/retransformed_forecasts/forest_forecast.rds"))
-ar1_forecast <- read_rds(ar1_forecast, paste0(export, "other_cases/rate3month/retransformed_forecasts/ar1_forecast.rds"))
-base_forecast <- read_rds(base_forecast, paste0(export, "other_cases/rate3month/retransformed_forecasts/base_forecast.rds"))
-naive_forecast <- read_rds(naive_forecast, paste0(export, "other_cases/rate3month/retransformed_forecasts/naive_forecast.rds"))
+arima_forecast <- read_rds(paste0(export, "other_cases/rate3month/retransformed_forecasts/arima_forecast.rds"))
+forest_forecast <- read_rds(paste0(export, "other_cases/rate3month/retransformed_forecasts/forest_forecast.rds"))
+ar1_forecast <- read_rds(paste0(export, "other_cases/rate3month/retransformed_forecasts/ar1_forecast.rds"))
+base_forecast <- read_rds(paste0(export, "other_cases/rate3month/retransformed_forecasts/base_forecast.rds"))
+naive_forecast <- read_rds(paste0(export, "other_cases/rate3month/retransformed_forecasts/naive_forecast.rds"))
 
 values_df <- df %>% 
   dplyr::filter(lubridate::year(date) >= 1948)
 
-tsData <- ts(values_df$rate3month, start = c(1948, 1), frequency = 12)
+us_values <- us_df %>% 
+  select(date, rate3month)
+tsData <- ts(us_values$rate3month, start = c(1947, 1), frequency = 12)
 rate3month <- window(tsData, start = c(1985, 1), end = c(1995, 1))
 
 this_naive_forecast <- window(tsData, start = c(1984, 12), end = c(1994, 12))
