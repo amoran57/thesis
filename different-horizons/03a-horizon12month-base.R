@@ -443,9 +443,9 @@ for (k in 1:length(arima_monthly_dates)) {
   
   pred_a <- forecast(arima(train_tsData, order = c(1,0,0)), 12)$mean[12]
   
-  pred_ar1 <- pred_a[k]
+  pred_ar1[k] <- pred_a
 }
-pred_arima <- ts(pred_arima, start = c(1999,1), frequency = 12)
+pred_arima <- ts(pred_ar1, start = c(1999,1), frequency = 12)
 
 naive <- window(tsData, start = c(1998, 1), end = c(2019, 1))
 naive_forecast <- ts(naive, start = c(1999, 1), frequency = 12)
@@ -453,6 +453,7 @@ naive_forecast <- ts(naive, start = c(1999, 1), frequency = 12)
 #Compare ----------------------------------------
 accuracy(tsData, forest_forecast_ts)
 accuracy(tsData, pred_arima)
+accuracy(tsData, naive_forecast)
 
 #Export ----------------------------------
 write_rds(forest_forecast_ts, paste0(export,"different_horizons/horizon12month/base_forecast.rds"))
