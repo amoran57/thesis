@@ -750,7 +750,6 @@ for (k in 1:length(monthly_dates)) {
 }
 toc()
 
-
 forest_forecast_ts <- ts(forecasts_rf, start = c(2010, 1), frequency = 12)
 
 #Predict using ARIMA -----------------------------
