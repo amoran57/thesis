@@ -43,7 +43,7 @@ forest_forecast <- read_rds(paste0(export, "other_cases/rate3month/forecast.rds"
 ar1_forecast <- read_rds(paste0(export, "other_cases/rate3month/ar1_forecast.rds"))
 base_forecast <- read_rds(paste0(export, "other_cases/rate3month/base_forecast.rds"))
 
-forecast_df <- data.frame(date = seq(as.Date("1990/1/1"), as.Date("2000/1/1"), "month"), 
+forecast_df <- data.frame(date = seq(as.Date("1985/1/1"), as.Date("1995/1/1"), "month"), 
                           arima = arima_forecast, 
                           forest = forest_forecast,
                           ar1 = ar1_forecast,
@@ -57,10 +57,10 @@ full_df$lag_ar1_forecast <- full_df$core - full_df$ar1
 full_df$lag_base_forecast <- full_df$core - full_df$base
 
 #Delag them
-detrend_arima_forecast <- ts(full_df$lag_ar1_forecast[-c(1:456)], start = c(1984, 12), frequency = 12)
-detrend_forest_forecast <- ts(full_df$lag_ar1_forecast[-c(1:456)], start = c(1984, 12), frequency = 12)
+detrend_arima_forecast <- ts(full_df$lag_arima_forecast[-c(1:456)], start = c(1984, 12), frequency = 12)
+detrend_forest_forecast <- ts(full_df$lag_forest_forecast[-c(1:456)], start = c(1984, 12), frequency = 12)
 detrend_ar1_forecast <- ts(full_df$lag_ar1_forecast[-c(1:456)], start = c(1984, 12), frequency = 12)
-detrend_base_forecast <- ts(full_df$lag_ar1_forecast[-c(1:456)], start = c(1984, 12), frequency = 12)
+detrend_base_forecast <- ts(full_df$lag_base_forecast[-c(1:456)], start = c(1984, 12), frequency = 12)
 detrend_naive_forecast <- ts(original_ts$lag_naive[-c(1:2)], start = c(1947, 2), frequency = 12)
 
 #Detrend them to get the original forecast
