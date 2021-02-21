@@ -458,4 +458,4 @@ accuracy(tsData, naive_forecast)
 #Export ----------------------------------
 write_rds(forest_forecast_ts, paste0(export,"different_horizons/horizon6month/base_forecast.rds"))
 write_rds(pred_arima, paste0(export, "different_horizons/horizon6month/ar1_forecast.rds"))
-write_rds(naive, paste0(export, "different_horizons/horizon6month/naive_forecast"))
+write_rds(naive_forecast, paste0(export, "different_horizons/horizon6month/naive_forecast.rds"))
