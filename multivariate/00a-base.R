@@ -47,7 +47,7 @@ call <- as.formula(call)
 
 penalties <- seq(0.7, 0.99, by = 0.005)
 penalty <- 0.9
-libs <- c("dplyr", "tictoc", "ggplot2")
+lib <- c("dplyr", "tictoc", "ggplot2")
 formula <- call
 feature_frac <- 0.7
 sample_data <- TRUE
