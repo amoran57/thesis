@@ -763,5 +763,3 @@ forest_forecast_ts <- ts(forecasts_rf, start = c(1999, 1), frequency = 12)
 accuracy(tsData, forest_forecast_ts)
 
 write_rds(forest_forecast_ts, paste0(export,"multivariate/forecast.rds"))
-
-#R2R
