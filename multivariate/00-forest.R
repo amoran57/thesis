@@ -10,25 +10,35 @@ values_df <- df %>%
 
 tsData <- ts(values_df$infl, start = c(1962, 1), frequency = 12)
 
-raw_mbd <- embed(values_df$infl, 12)
+raw_mbd <- embed(values_df$infl, 7)
 raw_mbd <- as.data.frame(raw_mbd)
 
-lag_features <- as.character(seq(1:11))
+lag_features <- as.character(seq(1:6))
 for(i in 1:length(lag_features)) {
   lag_features[i] <- paste0("tmin", as.character(i))
 }
+names(raw_mbd) <- c("t", lag_features)
+dated_mbd <- data.frame(date = values_df$date[-c(1:6)], raw_mbd)
 
 other_vars <- values_df %>% 
-  dplyr::select(rate10yr, rate3month, unemp, nat_unemp)
-other_vars <- other_vars[-c(1:10, nrow(other_vars)),]
+  dplyr::select(date, rate10yr, rate3month, unemp, nat_unemp)
 rownames(other_vars) <- seq(1, nrow(other_vars))
 
-names(raw_mbd) <- c("t", lag_features)
-infl_mbd <- data.frame(raw_mbd, other_vars)
+for(feature in colnames(other_vars)[-1]) {
+  this_df <- other_vars[c("date",feature)]
+  this_feature <- this_df[,2]
+  this_feature_mbd <- data.frame(embed(this_feature, 6))
+  pre_names <- as.character(seq(1:6))
+  colnames(this_feature_mbd) <- c(paste0(feature,"min",pre_names))
+  this_feature_mbd <- this_feature_mbd[-nrow(this_feature_mbd),]
+  this_feature_mbd$date <- this_df[-c(1:6), "date"]
+  dated_mbd <- left_join(dated_mbd, this_feature_mbd, by = "date")
+}
+
+
+infl_mbd <- dated_mbd[-1]
 rownames(infl_mbd) <- seq(1:nrow(raw_mbd))
 features <- colnames(infl_mbd)[-1]
-
-dated_mbd <- data.frame(date = values_df$date[-c(1:11)], infl_mbd)
 
 #get formula call
 ind <- glue::glue_collapse(x = features, " + ")
