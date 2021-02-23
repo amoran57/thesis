@@ -63,7 +63,7 @@ horizon <- 12
 avg_mentions <- data.frame(matrix(nrow = nrow(freq_mentions), ncol = ncol(freq_mentions) - horizon))
 rownames(avg_mentions) <- rownames(mentions)[-13]
 colnames(avg_mentions) <- colnames(mentions)[-c(1:horizon)]
-for(i in horizon:(ncol(avg_mentions + horizon))) {
+for(i in horizon:(ncol(avg_mentions) + horizon)) {
   small_df <- freq_mentions[,c((i-horizon+1):i)]
   avg <- rowMeans(small_df, na.rm = TRUE)
   #get only the top 3 values
@@ -85,3 +85,4 @@ avg_plot <- ggplot(clean_tidy_avg, aes(x = date, y = value, color = key)) +
   geom_point()
 avg_plot
 
+write.csv(avg_df, paste0(export,"custom_forest_analysis/feature_graph_data.csv"))
