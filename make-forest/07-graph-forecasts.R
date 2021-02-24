@@ -10,7 +10,8 @@ ar1_sample_ts <- read_rds(paste0(export, "4_year_forecasts/ar1_obj_forecast_samp
 strict_ar1 <- read_rds(paste0(export, "4_year_forecasts/strict_ar1_forecast.rds"))
 adjusted <- read_rds(paste0(export, "4_year_forecasts/ar1_obj_forecast_adjusted.rds"))
 straight <- read_rds(paste0(export,"4_year_forecasts/ar1_obj_forecast_straight.rds"))
-ar1_mean <- (ar1_ts + ar1_sample_ts)/2
+big_forest <- readRDS(paste0(export, "4_year_forecasts/ar1_obj_forecast_sample_straight_100.rds"))
+ar1_mean <- (straight + ar1_sample_ts)/2
 mean <- read_rds(paste0(export, "4_year_forecasts/mean_forecast_sample.rds"))
 
 values_df <- df %>% 
@@ -69,7 +70,9 @@ count(graph_df, strict_closer)
 accuracy(tsData, ar1_ts)
 accuracy(tsData, mean)
 accuracy(tsData, ar1_sample_ts)
+accuracy(tsData, straight)
 accuracy(tsData, ar1_mean)
+accuracy(tsData, big_forest)
 accuracy(tsData, adjusted)
 accuracy(tsData, arima_forecast)
 accuracy(tsData, strict_ar1)
